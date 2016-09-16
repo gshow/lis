@@ -12,7 +12,7 @@ type Point struct {
 }
 
 type Points struct {
-	pt     *point
+	pt     *Point
 	expire uint32
 }
 
