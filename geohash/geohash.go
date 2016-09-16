@@ -1,4 +1,4 @@
-package location
+package geohash
 
 //reference, v20160916: https://github.com/sillydong/geohash
 import (

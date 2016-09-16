@@ -1,5 +1,7 @@
 package location
 
+var GeohashPrecision int = 6
+
 type QueryObject struct {
 	lat    float64
 	lng    float64

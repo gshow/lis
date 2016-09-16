@@ -13,8 +13,8 @@ type Container struct {
 }
 
 type ContainerMap struct {
-	data map[string]*Container
-	lock sync.RWMutex
+	Data map[uint8]*Container
+	Lock sync.RWMutex
 }
 
 var ContainerMapAll = ContainerMap{}
