@@ -1,18 +1,26 @@
 package command
 
 import (
+	"fmt"
+
+	"github.com/gshow/obis/location"
 	"github.com/gshow/obis/point"
 )
 
-type CommandPoint interface{}
-
-func (*CommandPoint) Set(pt *point) bool {
-
+func PointSet(pso *point.PointSetObject) bool {
+	//save to roleMap-pointHashContainer-point
+	//save to geohash
+	a := &location.ContainerMapAll
+	b := &point.Point{}
+	fmt.Println(a, b, pso)
+	return true
 }
 
-func (*CommandPoint) Delete(pt *point) bool {
+func PointDelete() bool {
 
+	return true
 }
-func (*CommandPoint) Query() bool {
 
+func PointQuery() *point.Point {
+	return new(point.Point)
 }
