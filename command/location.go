@@ -1,7 +1,7 @@
 package command
 
 import (
-	"github.com/obis/point"
+	"github.com/gshow/obis/point"
 )
 
 type CommandLocation interface{}
