@@ -10,9 +10,3 @@ pointHashContainer
 point
 
 */
-
-type RoleContainer struct {
-	ptcon PointsHashContainer
-}
-
-var RoleMap = make(map[uint8]*RoleContainer)

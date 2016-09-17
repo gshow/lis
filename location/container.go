@@ -3,7 +3,7 @@ package location
 import (
 	"sync"
 
-	"github.com/gshow/obis/point"
+	"obis/point"
 )
 
 type Container struct {

@@ -3,34 +3,22 @@ package command
 import (
 	"fmt"
 
-	"github.com/gshow/obis/geohash"
-	"github.com/gshow/obis/location"
-	"github.com/gshow/obis/point"
+	"obis/geohash"
+	"obis/location"
+	"obis/point"
 )
 
-
-
-
-func PointSet(pso point.PointSetObject) bool {
+func PointSet(pso point.Point, expire int32) bool {
 	//save to roleMap-pointHashContainer-point
-	
-	//save to geohash
-	
-	
-	
-	
-	
-	
-	a := &location.ContainerMapAll
-
 	gh, _ := geohash.Encode(pso.Lat, pso.Lng, location.GeohashPrecision)
 
-	_, ok := location.ContainerMapAll.Data[pso.Role]
-	if(){
-		
-	}
+	pso.Hash = gh
 
-	fmt.Println(a, pso, gh, ok)
+	point.Set(pso, expire)
+
+	//save to geohash
+
+	fmt.Println(gh, pso)
 	return true
 }
 

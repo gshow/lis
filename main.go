@@ -1,15 +1,14 @@
 package main
 
 import (
-	"github.com/gshow/obis/command"
-	"github.com/gshow/obis/point"
+	"obis/command"
+	"obis/point"
 )
 
 func main() {
-	pt := point.Point{Id: 1, Lat: 40.0728, Lng: 116.318014, Role: 1, Ext: 222}
-	obj := point.PointSetObject{Point: pt, Expire: 33333}
 
-	command.PointSet(obj)
+	pt := point.Point{Id: 1, Lat: 40.0728, Lng: 116.318014, Role: 1, Ext: 222}
+	command.PointSet(pt, 333)
 }
 
 /*
