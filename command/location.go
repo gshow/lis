@@ -1,3 +1,3 @@
 package command
 
-//"github.com/gshow/obis/point"
+//"github.com/gshow/lis/point"

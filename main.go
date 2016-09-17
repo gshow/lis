@@ -1,8 +1,8 @@
 package main
 
 import (
-	"obis/command"
-	"obis/point"
+	"lis/command"
+	"lis/point"
 )
 
 func main() {

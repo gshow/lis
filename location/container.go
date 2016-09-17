@@ -3,7 +3,7 @@ package location
 import (
 	"sync"
 
-	"obis/point"
+	"lis/point"
 )
 
 type Container struct {

@@ -3,9 +3,9 @@ package command
 import (
 	"fmt"
 
-	"obis/geohash"
-	"obis/location"
-	"obis/point"
+	"lis/geohash"
+	"lis/location"
+	"lis/point"
 )
 
 func PointSet(pso point.Point, expire int32) bool {
