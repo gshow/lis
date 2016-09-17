@@ -29,6 +29,6 @@ func PointQuery(qr point.QueryObject) point.Point {
 	return point.Query(qr)
 }
 
-func LocationQuery(qr location.QueryObject) []point.Point {
+func LocationQuery(qr location.QueryObject) []location.QueryResult {
 	return location.Query(qr)
 }

@@ -5,17 +5,38 @@ import (
 	"lis/command"
 	"lis/location"
 	"lis/point"
+	"lis/tool"
+	"time"
 )
 
 var p = fmt.Println
 
+//middle  where?   116.276329,40.056109
+
+//pointTopLeft 上庄水库 116.210036,40.111421
+//bottomright 清华大学  116.332556,40.009424
+
+var pointTopLeft point.Point = point.Point{Lat: 40.111421, Lng: 116.210036}
+var poinBottomRight point.Point = point.Point{Lat: 40.009424, Lng: 116.32556}
+
+//var pointMiddle400m point.Point = point.Point{Lat: 40.057686, Lng: 116.291741}
+
+var pointMiddle point.Point = point.Point{Lat: 40.056109, Lng: 116.276329}
+
+var pointNum int = 200
+var queryLimit int = 20
+
 func main() {
+
 	testSet()
 
 	testPointQuery()
 	testLocationQuery()
 
-	summerize()
+	testSummerize()
+	//116.291741,40.057686
+
+	//fmt.Println("------test distance:----", tool.EarthDistance(pointMiddle.Lat, pointMiddle.Lng, pointMiddle400m.Lat, pointMiddle400m.Lng))
 }
 
 func testLocationQuery() {
@@ -31,13 +52,16 @@ func testLocationQuery() {
 	  }
 
 	*/
-	qr := location.QueryObject{Lat: 40.072811113, Lng: 116.318014, Radius: 4000, Role: 5, Limit: 3, Order: "distance"}
-	ret := location.Query(qr)
+	//数字山谷，滴滴大厦 116.296769,40.04987
+	qr := location.QueryObject{Lat: pointMiddle.Lat, Lng: pointMiddle.Lng, Radius: 4000, Role: 5, Limit: queryLimit, Order: "distance"}
+	ret := command.LocationQuery(qr)
 
-	p("------location.Query query=>result -------", qr, ret)
+	if tool.Debug() {
+		p("------location.Query query=>result -------", qr, ret)
+	}
 }
 
-func summerize() {
+func testSummerize() {
 	point.Summerize()
 
 	location.Summerize()
@@ -48,24 +72,36 @@ func testPointQuery() {
 	qr := point.QueryObject{Id: 2, Role: 5}
 	ret := command.PointQuery(qr)
 
-	p("------point.Query query=>result -------", qr, ret)
+	if tool.Debug() {
+		p("------point.Query query=>result -------", qr, ret)
+	}
 }
 
 func testSet() {
-	pt := point.Point{Id: 1, Lat: 40.072811113, Lng: 116.318014, Role: 5, Ext: 222, Expire: 333333}
-	command.PointSet(pt)
 
-	pt = point.Point{Id: 2, Lat: 40.0728223332, Lng: 116.318014, Role: 5, Ext: 222, Expire: 333333}
-	command.PointSet(pt)
+	//	var pointTopLeft point.Point = point.Point{Lat: 40.111421, Lng: 116.210036}
+	//	var poinBottomRight point.Point = point.Point{Lat: 40.009424, Lng: 116.332556}
 
-	pt = point.Point{Id: 1, Lat: 41.072823123, Lng: 116.318014, Role: 5, Ext: 222, Expire: 333333}
-	command.PointSet(pt)
+	//	var pointMiddle point.Point = point.Point{Lat: 40.056109, Lng: 116.296329}
 
-	pt = point.Point{Id: 1, Lat: 43.0728, Lng: 116.318014, Role: 5, Ext: 222, Expire: 333333}
-	command.PointSet(pt)
+	latStep := (pointTopLeft.Lat - poinBottomRight.Lat) / float64(pointNum)
+	lngStep := (poinBottomRight.Lng - pointTopLeft.Lng) / float64(pointNum)
+	fmt.Println("-------steps---------", latStep, lngStep, pointNum)
 
-	pt = point.Point{Id: 3, Lat: 40.0728, Lng: 116.318014, Role: 9, Ext: 222, Expire: 333333}
-	command.PointSet(pt)
+	//	hashTopLeft, _ := geohash.Encode(pointTopLeft.Lat, pointTopLeft.Lng, 6)
+	//	hashBottomRight, _ := geohash.Encode(poinBottomRight.Lat, poinBottomRight.Lng, 6)
+	//	fmt.Print("---hashlimit---", hashTopLeft, "------", hashBottomRight)
+
+	role := uint8(5)
+	for i := 0; i < pointNum; i++ {
+		exp := time.Now().Second() + int(i)
+		pt := point.Point{Id: uint64(i), Lat: pointTopLeft.Lat - latStep*float64(i), Lng: pointTopLeft.Lng + lngStep*float64(i), Role: role, Ext: 0, Expire: exp}
+
+		//fmt.Println("-------item---------", pt.Lat, pt.Lng)
+
+		command.PointSet(pt)
+	}
+
 }
 
 /*

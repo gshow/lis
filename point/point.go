@@ -4,6 +4,7 @@ import (
 	"sync"
 	//"lis/role"
 	"fmt"
+	"lis/tool"
 	"time"
 )
 
@@ -33,8 +34,8 @@ type Point struct {
 	Role uint8
 
 	Ext    int64
-	Update int64
-	Expire int64
+	Update int
+	Expire int
 }
 
 type PointShell struct {
@@ -77,11 +78,9 @@ func Query(qr QueryObject) Point {
 
 func Set(pt Point) (bool, string, *PointShell) {
 	//save to roleMap-pointHashContainer-point
-
 	checkRoleContainer(pt, true)
 	checkShellContainer(pt, true)
-
-	pt.Update = time.Now().Unix()
+	pt.Update = time.Now().Second()
 	oldHash := ""
 
 	shell, ok := roleMap.Rdata[pt.Role].Sdata[pt.Id]
@@ -97,9 +96,26 @@ func Set(pt Point) (bool, string, *PointShell) {
 
 	}
 
-	fmt.Println("-----point.Set()----", pt, roleMap)
+	if tool.Debug() {
+		//fmt.Println("-----point.Set()----", pt, roleMap)
+		//fmt.Println("geohash:", pt.Hash)
+	}
 	return true, oldHash, roleMap.Rdata[pt.Role].Sdata[pt.Id]
 
+}
+
+func CheckNotExpire(pshell *PointShell) bool {
+
+	if time.Now().Second() > pshell.Point.Expire {
+		go deletePoint(pshell)
+		return false
+	}
+	return true
+
+}
+
+func deletePoint(pshell *PointShell) {
+	//@todo finish this body
 }
 
 func checkShellContainer(pt Point, create bool) bool {
