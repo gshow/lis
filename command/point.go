@@ -8,17 +8,18 @@ import (
 	"lis/point"
 )
 
-func PointSet(pso point.Point, expire int32) bool {
+func PointSet(point2 point.Point) bool {
 	//save to roleMap-pointHashContainer-point
-	gh, _ := geohash.Encode(pso.Lat, pso.Lng, location.GeohashPrecision)
+	gh, _ := geohash.Encode(point2.Lat, point2.Lng, location.GeohashPrecision)
+	point2.Hash = gh
 
-	pso.Hash = gh
-
-	point.Set(pso, expire)
+	ok, oldGeohash, shell := point.Set(point2)
+	defer shell.Lock.Unlock()
 
 	//save to geohash
+	location.Set(shell, oldGeohash)
 
-	fmt.Println(gh, pso)
+	fmt.Println("-----finishi.result()----", ok, oldGeohash, shell)
 	return true
 }
 
