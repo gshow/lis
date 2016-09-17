@@ -2,19 +2,113 @@ package location
 
 import (
 	"fmt"
+	"lis/geohash"
 	"lis/point"
 	"sync"
 )
 
-var GeohashPrecision int = 6
+/*
+
+data structure:
+locationMap{
+	Ldata:{
+		geohash:RoleContainer{
+			Rdata:{
+				roleid:ShellContainer{
+					Sdata:{
+						id:PointShell
+
+					}
+
+				}
+			}
+
+
+		}
+	}
+
+}
+
+*/
+
+const GeohashPrecision int = 6
 
 type QueryObject struct {
-	lat    float64
-	lng    float64
-	radius uint32
-	limit  uint32
-	role   uint8
-	order  string
+	Lat    float64
+	Lng    float64
+	Radius uint32
+	Role   uint8
+
+	Limit uint32
+	Order string
+}
+
+var RadisLoopMap map[int]uint32
+
+func init() {
+	RadisLoopMap = map[int]uint32{1: 1828, 2: 3047, 3: 4265, 4: 5484, 5: 6703}
+
+}
+
+func getLoopTimesByRadius(radius uint32) int {
+
+	var ret, max int
+	ret, max = 0, 0
+	for times, distance := range RadisLoopMap {
+		if radius <= distance {
+			ret = times
+			break
+		}
+		max = times
+
+	}
+	if ret == 0 {
+		ret = max
+	}
+	return ret
+
+}
+
+func getNeighbours(qr QueryObject) []string {
+	loopTimes := getLoopTimesByRadius(qr.Radius)
+	nei := geohash.LoopNeighbors(qr.Lat, qr.Lng, GeohashPrecision, loopTimes)
+	var ret []string
+	for _, circle := range nei {
+		for _, hash := range circle {
+			ret = append(ret, hash)
+		}
+	}
+	fmt.Println("-------loop times:---", loopTimes)
+
+	return ret
+
+}
+
+func Query(qr QueryObject) []point.Point {
+
+	//qr := location.QueryObject{Lat: 40.072811113, Lng: 116.318014, Radius: 300, Role: 5, Limit: 3, Order: "distance/update"}
+
+	hash, _ := geohash.Encode(qr.Lat, qr.Lng, GeohashPrecision)
+	hash += ""
+
+	neighbours := getNeighbours(qr)
+
+	fmt.Println("-------loop neighbours:---", neighbours, len(neighbours))
+
+	a := []point.Point{point.Point{}}
+	return a
+}
+
+func Summerize() {
+	fmt.Println("-----locationMap.size----", len(locationMap.Ldata))
+	for hash, roleContainer := range locationMap.Ldata {
+		fmt.Println("-----locationMap.hash=>size----", hash, len(roleContainer.Rdata))
+
+		for roleid, shellContainer := range roleContainer.Rdata {
+			fmt.Println("-----locationMap.hash,role=>size----", hash, roleid, len(shellContainer.Sdata))
+		}
+	}
+
 }
 
 type LocationContainer struct {
@@ -33,7 +127,7 @@ func Set(shell *point.PointShell, oldGeohash string) bool {
 	//checkShellContainer(shell)
 
 	if oldGeohash != "" {
-		//		fmt.Println(111, locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role])
+		fmt.Println(111, locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role])
 		shellContainer := locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role]
 		shellContainer.Lock.Lock()
 		defer shellContainer.Lock.Unlock()
