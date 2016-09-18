@@ -32,7 +32,7 @@ locationMap{
 
 */
 
-const GeohashPrecision int = 6
+var geohashPrecision int = 6
 
 type QueryObject struct {
 	Lat    float64
@@ -49,13 +49,32 @@ type QueryResult struct {
 	Distance float64
 }
 
-var RadisLoopMap map[int]float64 = map[int]float64{1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}
+var radiusLoopMap5 map[int]float64 = map[int]float64{1: 14700.0, 2: 24500.0, 3: 34300.0, 4: 44100.0, 5: 53900.0}
+
+var radiusLoopMap6 map[int]float64 = map[int]float64{1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}
+
+func SetGeohashPrecision(precision int) {
+	if precision == 5 {
+		geohashPrecision = 5
+	} else {
+		geohashPrecision = 6
+	}
+}
+
+func GetGeohashPrecision() int {
+	return geohashPrecision
+
+}
 
 func getLoopTimesByRadius(radius float64) int {
 
+	radiusLoopMap := radiusLoopMap6
+	if GetGeohashPrecision() == 5 {
+		radiusLoopMap = radiusLoopMap5
+	}
 	var ret, max int
 	ret, max = 0, 0
-	for times, distance := range RadisLoopMap {
+	for times, distance := range radiusLoopMap {
 		if radius <= distance {
 			ret = times
 			break
@@ -72,7 +91,7 @@ func getLoopTimesByRadius(radius float64) int {
 
 func getNeighbours(qr QueryObject) []string {
 	loopTimes := getLoopTimesByRadius(qr.Radius)
-	nei := geohash.LoopNeighbors(qr.Lat, qr.Lng, GeohashPrecision, loopTimes)
+	nei := geohash.LoopNeighbors(qr.Lat, qr.Lng, GetGeohashPrecision(), loopTimes)
 	var ret []string
 	for _, circle := range nei {
 		for _, hash := range circle {
@@ -91,7 +110,7 @@ func Query(qr QueryObject) []QueryResult {
 
 	//qr := location.QueryObject{Lat: 40.072811113, Lng: 116.318014, Radius: 300, Role: 5, Limit: 3, Order: "distance/update"}
 
-	hash, _ := geohash.Encode(qr.Lat, qr.Lng, GeohashPrecision)
+	hash, _ := geohash.Encode(qr.Lat, qr.Lng, GetGeohashPrecision())
 	hash += ""
 
 	neighbours := getNeighbours(qr)
@@ -220,22 +239,30 @@ func Set(shell *point.PointShell, oldGeohash string) bool {
 	checkRoleContainer(shell.Point, true)
 
 	if oldGeohash != "" {
-		shellContainer := locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role]
-		shellContainer.Lock.Lock()
-		defer shellContainer.Lock.Unlock()
+		//		shellContainer := locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role]
+		//		shellContainer.Lock.Lock()
+		//		defer shellContainer.Lock.Unlock()
 
-		_, ok := locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role].Sdata[shell.Point.Id]
+		//		_, ok := locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role].Sdata[shell.Point.Id]
 
-		if ok == true {
-			delete(locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role].Sdata, shell.Point.Id)
-		}
+		//map delete do not need mutex
+		delete(locationMap.Ldata[oldGeohash].Rdata[shell.Point.Role].Sdata, shell.Point.Id)
 
 	}
 	locationMap.Ldata[shell.Point.Hash].Rdata[shell.Point.Role].Sdata[shell.Point.Id] = shell
 
-	if tool.Debug() {
-		//fmt.Println("-----location.Set()----", locationMap)
-	}
+	//	if tool.Debug() {
+	//		fmt.Println("-----location.Set()----", locationMap)
+	//	}
+	return true
+
+}
+
+func DeletePoint(pt point.Point) bool {
+
+	//map delete, do not need mutex
+	delete(locationMap.Ldata[pt.Hash].Rdata[pt.Role].Sdata, pt.Id)
+
 	return true
 
 }

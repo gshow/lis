@@ -23,20 +23,70 @@ var poinBottomRight point.Point = point.Point{Lat: 40.009424, Lng: 116.32556}
 
 var pointMiddle point.Point = point.Point{Lat: 40.056109, Lng: 116.276329}
 
-var pointNum int = 200
+var pointNum int = 288
 var queryLimit int = 20
+
+/***
+
+dev route:
+=================
+point/set
+point/query
+location/query
+
+point/delete
+
+*internal/expire
+
+precision = 5/6 的支持！
+//point/expire ?!
+
+
+@todo
+command.loopThoughtExpireCheck()
+
+
+
+*/
 
 func main() {
 
+	//location.SetGeohashPrecision(5)
 	testSet()
+	command.PointExpireCollect()
 
-	testPointQuery()
+	//testPointQuery()
 	testLocationQuery()
+
+	//point garbage collect
+
+	/* start to test delete**/
+	//testDelete()
+	time.Sleep(time.Second * 2)
+
+	testLocationQuery()
+	/* end test delete**/
+	time.Sleep(time.Second * 2)
 
 	testSummerize()
 	//116.291741,40.057686
 
 	//fmt.Println("------test distance:----", tool.EarthDistance(pointMiddle.Lat, pointMiddle.Lng, pointMiddle400m.Lat, pointMiddle400m.Lng))
+}
+
+func testInactiveRecycle() {
+	for i := 160; i <= 169; i++ {
+		qr := point.QueryObject{Id: uint64(i), Role: 5}
+		command.PointDelete(qr)
+	}
+}
+
+func testDelete() {
+	for i := 160; i <= 169; i++ {
+		qr := point.QueryObject{Id: uint64(i), Role: 5}
+		command.PointDelete(qr)
+	}
+
 }
 
 func testLocationQuery() {
@@ -58,6 +108,10 @@ func testLocationQuery() {
 
 	if tool.Debug() {
 		p("------location.Query query=>result -------", qr, ret)
+		for _, v := range ret {
+			p(v.Pshell.Point.Id, ",")
+
+		}
 	}
 }
 
@@ -94,7 +148,13 @@ func testSet() {
 
 	role := uint8(5)
 	for i := 0; i < pointNum; i++ {
-		exp := time.Now().Second() + int(i)
+		exp := int(i)
+		//test expire
+		if i >= 160 && i <= 169 {
+			exp = 1
+
+		}
+
 		pt := point.Point{Id: uint64(i), Lat: pointTopLeft.Lat - latStep*float64(i), Lng: pointTopLeft.Lng + lngStep*float64(i), Role: role, Ext: 0, Expire: exp}
 
 		//fmt.Println("-------item---------", pt.Lat, pt.Lng)
