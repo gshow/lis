@@ -99,7 +99,10 @@ http listen port,
 func main() {
 
 	/*
+
 		http://localhost:8000/point/get?id=188&role=5
+
+		curl "http://localhost:8000/point/set" -d"id=188&role=5&lat=40.045839625&lng=116.2864475&ext=111111112&expire=2"
 
 		curl "http://localhost:8000/point/delete" -d"id=199&role=5"
 
