@@ -1,15 +1,42 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"lis/command"
 	"lis/location"
 	"lis/point"
 	"lis/tool"
+	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 )
 
+const (
+	retOK        int = 0
+	retArgsEmpty int = 101
+	retArgsError int = 102
+
+	retPointEmpty int = 151
+	retError      int = 500
+)
+
+var responseMap map[int]string = make(map[int]string)
+
 var p = fmt.Println
+
+func responseMapDefine() {
+
+	responseMap[retOK] = "ok"
+	responseMap[retArgsEmpty] = "arguments empty"
+	responseMap[retArgsError] = "arguments error:%s"
+
+	responseMap[retPointEmpty] = "no point got"
+
+	responseMap[retError] = "error"
+
+}
 
 //middle  where?   116.276329,40.056109
 
@@ -36,24 +63,32 @@ location/query
 
 point/delete
 
-*internal/expire @half
-
-precision = 5/6 的支持！
-//point/expire ?!
+done precision = 5/6 的支持！
 
 
-@todo
-command.loopThoughtExpireCheck()
 
 
+
+@todo http service
+@snapshot
+@snapshot recovery
+
+*point/expire ?!
+@done expire found when use,
+@todo command.loopThoughtExpireCheck()
+
+
+@master slave
 
 */
 
 func main() {
+	responseMapDefine()
+
+	command.PointExpireCollect()
 
 	//location.SetGeohashPrecision(5)
 	testSet()
-	command.PointExpireCollect()
 
 	//testPointQuery()
 	testLocationQuery()
@@ -61,24 +96,128 @@ func main() {
 	//point garbage collect
 
 	/* start to test delete**/
-	//testDelete()
-	time.Sleep(time.Second * 2)
+	testDelete()
+	//time.Sleep(time.Second * 2)
 
 	testLocationQuery()
 	/* end test delete**/
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
 	testSummerize()
 	//116.291741,40.057686
 
+	http.HandleFunc("/point/set", pointSetHandler)
+	http.HandleFunc("/point/delete", pointDeleteHandler)
+	http.HandleFunc("/point/get", pointGetHandler)
+
+	http.HandleFunc("/location/query", locationQueryHandler)
+
+	http.ListenAndServe(":8000", nil)
+
 	//fmt.Println("------test distance:----", tool.EarthDistance(pointMiddle.Lat, pointMiddle.Lng, pointMiddle400m.Lat, pointMiddle400m.Lng))
 }
 
+func pointSetHandler(response http.ResponseWriter, request *http.Request) {
+	//queryForm, err := url.ParseQuery(request.URL.RawQuery)
+
+}
+
+func pointDeleteHandler(response http.ResponseWriter, request *http.Request) {
+	//queryForm, err := url.ParseQuery(request.URL.RawQuery)
+
+}
+
+func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
+	//queryForm, err := url.ParseQuery(request.URL.RawQuery)
+
+}
+
+func pointRequestCommonArgsCheck(response http.ResponseWriter, request *http.Request) (point.QueryObject, bool) {
+	args, _ := url.ParseQuery(request.URL.RawQuery)
+	p("---request args---:", len(args), args)
+
+	pqr := point.QueryObject{}
+	if len(args) == 0 {
+		response.Write(renderResponse(retArgsEmpty, "", nil))
+		return pqr, false
+	}
+	oid, _ := args["id"]
+	orole, _ := args["role"]
+
+	if len(oid) < 1 || len(orole) < 1 {
+		response.Write(renderResponse(retArgsEmpty, "", nil))
+
+		return pqr, false
+	}
+	id, _ := strconv.Atoi(oid[0])
+	role, _ := strconv.Atoi(orole[0])
+	idu64 := uint64(id)
+	roleint := int(role)
+	if idu64 < uint64(1) || roleint < 1 {
+		response.Write(renderResponse(retArgsError, "id/role should greater than 0", nil))
+		return pqr, false
+	}
+
+	pqr.Id = idu64
+	pqr.Role = roleint
+	return pqr, true
+
+}
+func pointGetHandler(response http.ResponseWriter, request *http.Request) {
+
+	pointQuery, check := pointRequestCommonArgsCheck(response, request)
+	if !check {
+		return
+	}
+
+	dt := command.PointQuery(pointQuery)
+	p(pointQuery, dt)
+
+	response.Write(renderResponse(retOK, "", formatPointForResponse(dt)))
+
+}
+
+func renderResponse(errno int, errmsg string, dt interface{}) []byte {
+
+	ret := make(map[string]interface{})
+	ret["errno"] = errno
+	ret["errmsg"] = errmsg
+	if errmsg == "" {
+		msg, ok := responseMap[errno]
+		if ok {
+			ret["errmsg"] = msg
+		}
+
+	}
+
+	ret["data"] = dt
+
+	if dt == nil {
+		ret["data"] = "{}"
+	}
+
+	bRet, _ := json.Marshal(ret)
+	p(bRet)
+	return bRet
+}
 func testInactiveRecycle() {
 	for i := 160; i <= 169; i++ {
 		qr := point.QueryObject{Id: uint64(i), Role: 5}
 		command.PointDelete(qr)
 	}
+}
+
+func formatPointForResponse(pt point.Point) map[string]interface{} {
+	var ret map[string]interface{}
+	ret = make(map[string]interface{})
+	ret["id"] = pt.Id
+	ret["role"] = pt.Role
+
+	ret["lat"] = pt.Lat
+	ret["lng"] = pt.Lng
+	ret["update"] = pt.Update
+
+	return ret
 }
 
 func testDelete() {

@@ -58,6 +58,18 @@ type QueryObject struct {
 	Hash string
 }
 
+type QueryResultObject struct {
+	Id  uint64
+	Lat float64
+	Lng float64
+	//Hash string
+	Role int
+
+	Ext    int64
+	Update int
+	//Expire int
+}
+
 type idHashContainer struct {
 	Lock     sync.RWMutex
 	ShellMap map[uint64]*PointShell
@@ -77,7 +89,9 @@ var roleMap = roleContainer{RoleMap: make(map[int]roleObject)}
 
 func Query(qr QueryObject) Point {
 	pt := Point{Id: qr.Id, Role: qr.Role}
-	if checkIdHashContainer(pt, false) {
+
+	if !checkIdHashContainer(pt, false) {
+
 		return Point{}
 	}
 
@@ -139,7 +153,7 @@ func createPointShell(pt Point) *PointShell {
 
 func CheckNotExpire(pshell *PointShell) bool {
 
-	if pshell.Point.Expire > 0 && time.Now().Second() > pshell.Point.Expire {
+	if pshell.Point.Expire > 0 && int(time.Now().Unix()) > pshell.Point.Expire {
 		go ExpireQueueAdd(pshell)
 		return false
 	}

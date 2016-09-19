@@ -13,9 +13,9 @@ func PointSet(point2 point.Point) bool {
 	gh, _ := geohash.Encode(point2.Lat, point2.Lng, location.GetGeohashPrecision())
 	point2.Hash = gh
 
-	point2.Update = time.Now().Second()
+	point2.Update = int(time.Now().Unix())
 	if point2.Expire > 0 {
-		point2.Expire += time.Now().Second()
+		point2.Expire += int(time.Now().Unix())
 	}
 
 	oldGeohash, shell, callback := point.SetPrepare(point2)
