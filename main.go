@@ -18,8 +18,9 @@ const (
 	retArgsEmpty int = 101
 	retArgsError int = 102
 
-	retPointEmpty int = 151
-	retError      int = 500
+	retPointEmpty        int = 151
+	retPointDeleteFailed int = 161
+	retError             int = 500
 )
 
 var responseMap map[int]string = make(map[int]string)
@@ -124,11 +125,88 @@ func pointSetHandler(response http.ResponseWriter, request *http.Request) {
 
 func pointDeleteHandler(response http.ResponseWriter, request *http.Request) {
 	//queryForm, err := url.ParseQuery(request.URL.RawQuery)
+	pointQuery, check := pointRequestCommonArgsCheck(response, request)
+	if !check {
+		return
+	}
 
+	command.PointDelete(pointQuery)
+	//	ret := command.PointDelete(pointQuery)
+	//	ret = true
+	// 为了更友好，此处做了幂等 返回
+	//	if !ret {
+	//		response.Write(renderResponse(retPointDeleteFailed, "delete failed", nil))
+	//		return
+	//	}
+	response.Write(renderResponse(retOK, "", nil))
 }
 
 func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
-	//queryForm, err := url.ParseQuery(request.URL.RawQuery)
+
+	args, _ := url.ParseQuery(request.URL.RawQuery)
+	p("---request args---:", len(args), args)
+
+	if len(args) == 0 {
+		response.Write(renderResponse(retArgsEmpty, "", nil))
+		return
+	}
+
+	//lat/lng params check
+	olat, _ := args["lat"]
+	olng, _ := args["lng"]
+
+	if len(olat) < 1 || len(olng) < 1 {
+		response.Write(renderResponse(retArgsError, "request lat or lng emtpy!", nil))
+
+		return
+	}
+
+	lat, _ := strconv.ParseFloat(olat[0], 64)
+	lng, _ := strconv.ParseFloat(olng[0], 64)
+
+	if lat < -180.0 || lat > 180.0 {
+		response.Write(renderResponse(retArgsError, "lat range error", nil))
+		return
+	}
+	if lng < -180.0 || lng > 180.0 {
+		response.Write(renderResponse(retArgsError, "lng range error", nil))
+		return
+	}
+
+	//role check
+	orole, _ := args["role"]
+	role, _ := strconv.Atoi(orole[0])
+	if role < 1 {
+		response.Write(renderResponse(retArgsError, "role can not be 0", nil))
+		return
+	}
+
+	//radius check
+	oradius, _ := args["radius"]
+	radius, _ := strconv.ParseFloat(oradius[0], 64)
+	if radius < 0.0 {
+		response.Write(renderResponse(retArgsError, "radius must be bigger than 0", nil))
+		return
+	}
+	radiusMax := location.GetRadiusMax()
+	if radius > radiusMax {
+		response.Write(renderResponse(retArgsError, "radius must be smaller than "+fmt.Sprintf("%.6f", radiusMax), nil))
+		return
+	}
+
+	//limit check
+	//order check
+
+	qr := location.QueryObject{Lat: pointMiddle.Lat, Lng: pointMiddle.Lng, Radius: 4000, Role: 5, Limit: queryLimit, Order: "distance"}
+	ret := command.LocationQuery(qr)
+
+	if tool.Debug() {
+		p("------location.Query query=>result -------", qr, ret)
+		for _, v := range ret {
+			p(v.Pshell.Point.Id, ",")
+
+		}
+	}
 
 }
 
@@ -171,7 +249,12 @@ func pointGetHandler(response http.ResponseWriter, request *http.Request) {
 	}
 
 	dt := command.PointQuery(pointQuery)
-	p(pointQuery, dt)
+	//p(pointQuery, dt)
+	if dt.Id < 1 {
+		response.Write(renderResponse(retPointEmpty, "", nil))
+		return
+
+	}
 
 	response.Write(renderResponse(retOK, "", formatPointForResponse(dt)))
 
@@ -190,14 +273,11 @@ func renderResponse(errno int, errmsg string, dt interface{}) []byte {
 
 	}
 
-	ret["data"] = dt
-
-	if dt == nil {
-		ret["data"] = "{}"
+	if dt != nil {
+		ret["data"] = dt
 	}
 
 	bRet, _ := json.Marshal(ret)
-	p(bRet)
 	return bRet
 }
 func testInactiveRecycle() {

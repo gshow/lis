@@ -64,9 +64,15 @@ type QueryResult struct {
 	Distance float64
 }
 
-var radiusLoopMap5 map[int]float64 = map[int]float64{1: 14700.0, 2: 24500.0, 3: 34300.0, 4: 44100.0, 5: 53900.0}
+var radiusLoopMap map[int]map[int]float64 = map[int]map[int]float64{5: {1: 14700.0, 2: 24500.0, 3: 34300.0, 4: 44100.0, 5: 53900.0}, 6: {1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}}
 
-var radiusLoopMap6 map[int]float64 = map[int]float64{1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}
+//var radiusLoopMap5 map[int]float64 = map[int]float64{1: 14700.0, 2: 24500.0, 3: 34300.0, 4: 44100.0, 5: 53900.0}
+
+//var radiusLoopMap6 map[int]float64 = map[int]float64{1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}
+
+func GetRadiusMax() float64 {
+	return radiusLoopMap[GetGeohashPrecision()][5]
+}
 
 func SetGeohashPrecision(precision int) {
 	if precision == 5 {
@@ -83,13 +89,10 @@ func GetGeohashPrecision() int {
 
 func getLoopTimesByRadius(radius float64) int {
 
-	radiusLoopMap := radiusLoopMap6
-	if GetGeohashPrecision() == 5 {
-		radiusLoopMap = radiusLoopMap5
-	}
+	tmpMap := radiusLoopMap[GetGeohashPrecision()]
 	var ret, max int
 	ret, max = 0, 0
-	for times, distance := range radiusLoopMap {
+	for times, distance := range tmpMap {
 		if radius <= distance {
 			ret = times
 			break
