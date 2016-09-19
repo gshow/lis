@@ -182,24 +182,54 @@ func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
 	}
 
 	//radius check
-	oradius, _ := args["radius"]
-	radius, _ := strconv.ParseFloat(oradius[0], 64)
-	if radius < 0.0 {
-		response.Write(renderResponse(retArgsError, "radius must be bigger than 0", nil))
-		return
-	}
-	radiusMax := location.GetRadiusMax()
-	if radius > radiusMax {
-		response.Write(renderResponse(retArgsError, "radius must be smaller than "+fmt.Sprintf("%.6f", radiusMax), nil))
-		return
+	oradius, radiusExist := args["radius"]
+	if !radiusExist {
+		oradius = 2000
+	} else {
+		radius, _ := strconv.ParseFloat(oradius[0], 64)
+		if radius < 0.0 {
+			response.Write(renderResponse(retArgsError, "radius must be bigger than 0", nil))
+			return
+		}
+		radiusMax := location.GetRadiusMax()
+		if radius > radiusMax {
+			response.Write(renderResponse(retArgsError, "radius must be smaller than "+fmt.Sprintf("%.6f", radiusMax), nil))
+			return
+		}
 	}
 
 	//limit check
+	olimit, limitExist := args["limit"]
+	if !limitExist {
+		limit = 20
+	} else {
+		limit, _ := strconv.ParseFloat(oradius[0], 64)
+		if limit < 1 {
+			response.Write(renderResponse(retArgsError, "radius must be bigger than 0", nil))
+			return
+		}
+		if limit > 1000 {
+			response.Write(renderResponse(retArgsError, "radius must be smaller than 1000", nil))
+			return
+		}
+
+	}
 	//order check
+	order, orderExist := args["order"]
+	if !limitExist {
+		order = "distance"
+	} else {
+		order, _ := strconv.ParseFloat(oradius[0], 64)
+		if order!="distance" && order !="update"
+			response.Write(renderResponse(retArgsError, "order type must be distance/update", nil))
+			return
+		}
 
-	qr := location.QueryObject{Lat: pointMiddle.Lat, Lng: pointMiddle.Lng, Radius: 4000, Role: 5, Limit: queryLimit, Order: "distance"}
+	}
+
+	qr := location.QueryObject{Lat: lat, Lng: lng, Radius: radius, Role: role, Limit: limit, Order: order}
 	ret := command.LocationQuery(qr)
-
+//!!!!!!!!!!!!
 	if tool.Debug() {
 		p("------location.Query query=>result -------", qr, ret)
 		for _, v := range ret {
