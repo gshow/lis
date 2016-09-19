@@ -31,13 +31,13 @@ func PointDelete(qr point.QueryObject) bool {
 	return _pointDelete(qr, expireCheck)
 }
 
-func _pointDelete(qr point.QueryObject, expireCheck bool) bool {
+func _pointDelete(qr point.QueryObject, expireDelete bool) bool {
 	ok, point, callback := point.DeletePrepare(qr)
 	if !ok {
 		callback(false)
 		return false
 	}
-	if expireCheck && point.Expire >= time.Now().Second() {
+	if expireDelete && point.Expire >= time.Now().Second() {
 		callback(false)
 		return false
 	}

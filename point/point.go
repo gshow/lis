@@ -14,11 +14,16 @@ data structure:
 
 
 
-RoleContainer{
+roleContainer{
 	RoleMap:{
-		roleid:ShellContainer{
-			ShellMap:{
-				id:PointShell
+		roleid:Role{
+			IdHashMap:{
+				idhash:ShellContainer{
+					ShellMap:{
+						id:PointShell
+					}
+
+				}
 			}
 
 		}
@@ -27,6 +32,8 @@ RoleContainer{
 }
 
 */
+
+var idHashMod = uint64(102400)
 
 type Point struct {
 	Id   uint64
@@ -51,27 +58,30 @@ type QueryObject struct {
 	Hash string
 }
 
-type Role struct {
+type idHashContainer struct {
 	Lock     sync.RWMutex
 	ShellMap map[uint64]*PointShell
+}
+type roleContainer struct {
+	Lock    sync.RWMutex
+	RoleMap map[int]roleObject
+}
+type roleObject struct {
+	Lock       sync.RWMutex
+	IdHsashMap map[uint64]idHashContainer
 }
 
 //var PointsCollector = []*Point
 
-type RoleContainer struct {
-	Lock    sync.RWMutex
-	RoleMap map[int]Role
-}
-
-var roleMap = RoleContainer{RoleMap: make(map[int]Role)}
+var roleMap = roleContainer{RoleMap: make(map[int]roleObject)}
 
 func Query(qr QueryObject) Point {
 	pt := Point{Id: qr.Id, Role: qr.Role}
-	if !checkRoleContainer(pt, false) || !checkRole(pt, false) {
+	if checkIdHashContainer(pt, false) {
 		return Point{}
 	}
 
-	shell, ok := roleMap.RoleMap[pt.Role].ShellMap[pt.Id]
+	shell, ok := roleMap.RoleMap[pt.Role].IdHsashMap[qr.Id%idHashMod].ShellMap[qr.Id]
 	if ok == false {
 		return Point{}
 	}
@@ -82,12 +92,11 @@ func Query(qr QueryObject) Point {
 func SetPrepare(pt Point) (string, *PointShell, func(bool)) {
 	//save to roleMap-pointHashContainer-point
 
-	checkRoleContainer(pt, true)
-	checkRole(pt, true)
+	checkIdHashContainer(pt, true)
+	mod := pt.Id % idHashMod
 
 	oldHash := ""
-
-	shell, shellExist := roleMap.RoleMap[pt.Role].ShellMap[pt.Id]
+	shell, shellExist := roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id]
 
 	if shellExist {
 		oldHash = shell.Point.Hash
@@ -96,10 +105,10 @@ func SetPrepare(pt Point) (string, *PointShell, func(bool)) {
 
 		roleLock := roleMap.RoleMap[pt.Role].Lock
 		roleLock.Lock()
-		shell, shellExist = roleMap.RoleMap[pt.Role].ShellMap[pt.Id]
+		shell, shellExist = roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id]
 		if !shellExist {
 			shell = createPointShell(pt)
-			roleMap.RoleMap[pt.Role].ShellMap[pt.Id] = shell
+			roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id] = shell
 		}
 		roleLock.Unlock()
 	}
@@ -138,20 +147,23 @@ func CheckNotExpire(pshell *PointShell) bool {
 
 }
 
-func checkRole(pt Point, create bool) bool {
-	_, ok := roleMap.RoleMap[pt.Role]
+func checkIdHashContainer(pt Point, create bool) bool {
+
+	checkRoleContainer(pt, true)
+	mod := pt.Id % idHashMod
+	_, ok := roleMap.RoleMap[pt.Role].IdHsashMap[mod]
 	if ok == false && create == false {
 		return false
 	}
-	if ok == false && create == true {
-		roleMap.Lock.Lock()
-		defer roleMap.Lock.Unlock()
 
-		_, ok := roleMap.RoleMap[pt.Role]
-		if ok == false {
-			pmap := Role{ShellMap: make(map[uint64]*PointShell)}
-			roleMap.RoleMap[pt.Role] = pmap
-		}
+	roleCon := roleMap.RoleMap[pt.Role]
+	roleCon.Lock.Lock()
+	defer roleCon.Lock.Unlock()
+
+	idhashCon, ok := roleMap.RoleMap[pt.Role].IdHsashMap[mod]
+	if ok == false {
+		idhashCon = idHashContainer{ShellMap: make(map[uint64]*PointShell)}
+		roleMap.RoleMap[pt.Role].IdHsashMap[mod] = idhashCon
 	}
 	return true
 }
@@ -167,7 +179,7 @@ func checkRoleContainer(pt Point, create bool) bool {
 
 		_, ok := roleMap.RoleMap[pt.Role]
 		if ok == false {
-			pmap := Role{ShellMap: make(map[uint64]*PointShell)}
+			pmap := roleObject{IdHsashMap: make(map[uint64]idHashContainer)}
 			roleMap.RoleMap[pt.Role] = pmap
 		}
 	}
@@ -177,9 +189,12 @@ func checkRoleContainer(pt Point, create bool) bool {
 func Summerize() {
 	totalPoint := 0
 	fmt.Println("-----roleMap.size----", len(roleMap.RoleMap))
-	for role, son := range roleMap.RoleMap {
-		totalPoint += len(son.ShellMap)
-		fmt.Println("-----roleMap.role=>size----", role, len(son.ShellMap))
+	for /*roleid*/ _, son := range roleMap.RoleMap {
+		for /*idhash*/ _, idhashCon := range son.IdHsashMap {
+			totalPoint += len(idhashCon.ShellMap)
+		}
+
+		//fmt.Println("-----roleMap.roleObject=>size----", role, len(son.IdHsashMap))
 
 	}
 	fmt.Println("-----total point size----", totalPoint)
@@ -189,11 +204,12 @@ func Summerize() {
 func DeletePrepare(qr QueryObject) (bool, Point, func(bool)) {
 
 	pt := Point{Id: qr.Id, Role: qr.Role}
-	if !checkRoleContainer(pt, false) || !checkRole(pt, false) {
+	if !checkIdHashContainer(pt, false) {
 		return false, Point{}, func(bool) {}
 	}
 
-	shell, ok := roleMap.RoleMap[pt.Role].ShellMap[pt.Id]
+	mod := qr.Id % idHashMod
+	shell, ok := roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[qr.Id]
 	if ok == false {
 		return false, Point{}, func(bool) {}
 	}
@@ -205,7 +221,7 @@ func DeletePrepare(qr QueryObject) (bool, Point, func(bool)) {
 	return true, pret, func(result bool) {
 		defer shellCon.Lock.Unlock()
 		if result {
-			delete(roleMap.RoleMap[pt.Role].ShellMap, pt.Id)
+			delete(roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap, pt.Id)
 		}
 
 	}

@@ -14,9 +14,9 @@ data structure:
 
 LocationContainer{
 	Ldata:{
-		geohash:RoleContainer{
+		geohash:RoleConainer{
 			RoleMap:{
-				roleid:ShellContainer{
+				roleid:locationRole{
 					ShellMap:{
 						id:PointShell
 
@@ -35,7 +35,16 @@ LocationContainer{
 
 type LocationContainer struct {
 	Lock  sync.RWMutex
-	Ldata map[string]point.RoleContainer
+	Ldata map[string]roleContainer
+}
+
+type roleContainer struct {
+	Lock    sync.RWMutex
+	RoleMap map[int]locationRole
+}
+type locationRole struct {
+	Lock     sync.RWMutex
+	ShellMap map[uint64]*point.PointShell
 }
 
 var geohashPrecision int = 6
@@ -220,17 +229,17 @@ func queryHashArea(qr QueryObject, geohash string) []QueryResult {
 
 func Summerize() {
 	fmt.Println("-----locationMap.size----", len(locationMap.Ldata))
-	for hash, roleContainer := range locationMap.Ldata {
-		fmt.Println("-----locationMap.hash=>size----", hash, len(roleContainer.RoleMap))
+	for hash, roleCon := range locationMap.Ldata {
+		fmt.Println("-----locationMap.hash=>size----", hash, len(roleCon.RoleMap))
 
-		for roleid, shellContainer := range roleContainer.RoleMap {
+		for roleid, shellContainer := range roleCon.RoleMap {
 			fmt.Println("-----locationMap.hash,role=>size----", hash, roleid, len(shellContainer.ShellMap))
 		}
 	}
 
 }
 
-var locationMap = LocationContainer{Ldata: make(map[string]point.RoleContainer)}
+var locationMap = LocationContainer{Ldata: make(map[string]roleContainer)}
 
 func Set(shell *point.PointShell, oldGeohash string, callback func(bool)) bool {
 
@@ -280,14 +289,14 @@ func checkRoleContainer(pt point.Point, create bool) bool {
 		return false
 	}
 	if ok == false {
-		roleContainer := locationMap.Ldata[pt.Hash]
-		roleContainer.Lock.Lock()
-		defer roleContainer.Lock.Unlock()
+		roleCon := locationMap.Ldata[pt.Hash]
+		roleCon.Lock.Lock()
+		defer roleCon.Lock.Unlock()
 
-		_, ok := roleContainer.RoleMap[pt.Role]
+		_, ok := roleCon.RoleMap[pt.Role]
 		if ok == false {
-			shellContainer := point.Role{ShellMap: make(map[uint64]*point.PointShell)}
-			roleContainer.RoleMap[pt.Role] = shellContainer
+			shellContainer := locationRole{ShellMap: make(map[uint64]*point.PointShell)}
+			roleCon.RoleMap[pt.Role] = shellContainer
 		}
 	}
 	return true
@@ -305,7 +314,7 @@ func checkHashContainer(pt point.Point, create bool) bool {
 
 		_, ok := locationMap.Ldata[pt.Hash]
 		if ok == false {
-			roleContainer2 := point.RoleContainer{RoleMap: make(map[int]point.Role)}
+			roleContainer2 := roleContainer{RoleMap: make(map[int]locationRole)}
 			locationMap.Ldata[pt.Hash] = roleContainer2
 		}
 	}
