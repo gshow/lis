@@ -13,26 +13,36 @@ func PointSet(point2 point.Point) bool {
 	gh, _ := geohash.Encode(point2.Lat, point2.Lng, location.GetGeohashPrecision())
 	point2.Hash = gh
 
-	_, oldGeohash, shell := point.Set(point2)
-	defer shell.Lock.Unlock()
+	point2.Update = time.Now().Second()
+	if point2.Expire > 0 {
+		point2.Expire += time.Now().Second()
+	}
+
+	oldGeohash, shell, callback := point.SetPrepare(point2)
 
 	//save to geohash
-	location.Set(shell, oldGeohash)
+	location.Set(shell, oldGeohash, callback)
 
 	return true
 }
 
 func PointDelete(qr point.QueryObject) bool {
-
-	return _pointDelete(qr)
+	expireCheck := false
+	return _pointDelete(qr, expireCheck)
 }
 
-func _pointDelete(qr point.QueryObject) bool {
-	pt, ok := point.Delete(qr)
-	if ok == true && pt.Id > 0 {
-		location.DeletePoint(pt)
+func _pointDelete(qr point.QueryObject, expireCheck bool) bool {
+	ok, point, callback := point.DeletePrepare(qr)
+	if !ok {
+		callback(false)
+		return false
 	}
-	return true
+	if expireCheck && point.Expire >= time.Now().Second() {
+		callback(false)
+		return false
+	}
+	return location.DeletePoint(point, callback)
+
 }
 
 func PointQuery(qr point.QueryObject) point.Point {
@@ -63,7 +73,7 @@ func pointQueueExpireCheck() {
 
 		}()
 
-		ret := point.ExpireQueue.Read()
+		ret := point.ExpireQueueRead()
 		if ret == nil {
 			time.Sleep(time.Second * 1)
 			continue
@@ -71,7 +81,8 @@ func pointQueueExpireCheck() {
 
 		pshell := ret.Value.(*point.PointShell)
 
-		_pointDelete(point.QueryObject{pshell.Point.Id, pshell.Point.Role, pshell.Point.Hash})
+		expireCheck := true
+		_pointDelete(point.QueryObject{pshell.Point.Id, pshell.Point.Role, pshell.Point.Hash}, expireCheck)
 
 	}
 

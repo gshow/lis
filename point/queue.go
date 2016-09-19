@@ -4,27 +4,21 @@ import (
 	"container/list"
 )
 
-type ExpireQueueObject *list.Element
+var expireQueue *list.List = list.New()
 
-var ExpireQueue *pointQueue = &pointQueue{Queue: list.New()}
-
-type pointQueue struct {
-	Queue *list.List
+func ExpireQueueAdd(ps *PointShell) *list.Element {
+	return expireQueue.PushBack(ps)
 }
 
-func (this *pointQueue) Add(ps *PointShell) *list.Element {
-	return this.Queue.PushBack(ps)
-}
-
-func (this *pointQueue) Read() *list.Element {
-	ret := this.Queue.Front()
+func ExpireQueueRead() *list.Element {
+	ret := expireQueue.Front()
 	if ret != nil {
-		this.Queue.Remove(ret)
+		expireQueue.Remove(ret)
 	}
 
 	return ret
 }
 
-func (this *pointQueue) Len() int {
-	return this.Queue.Len()
+func ExpireQueueLen() int {
+	return expireQueue.Len()
 }

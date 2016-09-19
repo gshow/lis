@@ -36,7 +36,7 @@ location/query
 
 point/delete
 
-*internal/expire
+*internal/expire @half
 
 precision = 5/6 的支持！
 //point/expire ?!
@@ -146,7 +146,7 @@ func testSet() {
 	//	hashBottomRight, _ := geohash.Encode(poinBottomRight.Lat, poinBottomRight.Lng, 6)
 	//	fmt.Print("---hashlimit---", hashTopLeft, "------", hashBottomRight)
 
-	role := uint8(5)
+	role := 5
 	for i := 0; i < pointNum; i++ {
 		exp := int(i)
 		//test expire
