@@ -52,7 +52,7 @@ var geohashPrecision int = 6
 type QueryObject struct {
 	Lat    float64
 	Lng    float64
-	Radius float64
+	Radius int
 	Role   int
 
 	Limit int
@@ -70,8 +70,8 @@ var radiusLoopMap map[int]map[int]float64 = map[int]map[int]float64{5: {1: 14700
 
 //var radiusLoopMap6 map[int]float64 = map[int]float64{1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}
 
-func GetRadiusMax() float64 {
-	return radiusLoopMap[GetGeohashPrecision()][5]
+func GetRadiusMax() int {
+	return int(radiusLoopMap[GetGeohashPrecision()][5])
 }
 
 func SetGeohashPrecision(precision int) {
@@ -87,13 +87,14 @@ func GetGeohashPrecision() int {
 
 }
 
-func getLoopTimesByRadius(radius float64) int {
+func getLoopTimesByRadius(radius int) int {
 
+	fradius := float64(radius)
 	tmpMap := radiusLoopMap[GetGeohashPrecision()]
 	var ret, max int
 	ret, max = 0, 0
 	for times, distance := range tmpMap {
-		if radius <= distance {
+		if fradius <= distance {
 			ret = times
 			break
 		}
@@ -215,7 +216,7 @@ func queryHashArea(qr QueryObject, geohash string) []QueryResult {
 			continue
 		}
 		distance := tool.EarthDistance(qr.Lat, qr.Lng, pshell.Point.Lat, pshell.Point.Lng)
-		if distance > qr.Radius {
+		if int(distance) > qr.Radius {
 			continue
 		}
 		ret = append(ret, QueryResult{Pshell: pshell, Distance: distance})

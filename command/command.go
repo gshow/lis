@@ -17,7 +17,7 @@ func PointSet(point2 point.Point) bool {
 	if point2.Expire > 0 {
 		point2.Expire += int(time.Now().Unix())
 	}
-
+	fmt.Println("----got set---", point2)
 	oldGeohash, shell, callback := point.SetPrepare(point2)
 
 	//save to geohash

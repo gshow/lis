@@ -99,6 +99,9 @@ func Query(qr QueryObject) Point {
 	if ok == false {
 		return Point{}
 	}
+	if !CheckNotExpire(shell) {
+		return Point{}
+	}
 	return shell.Point
 
 }

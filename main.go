@@ -15,6 +15,7 @@ import (
 
 const (
 	retOK        int = 0
+	retFailed    int = 1
 	retArgsEmpty int = 101
 	retArgsError int = 102
 
@@ -70,6 +71,9 @@ done precision = 5/6 的支持！
 
 
 
+
+
+
 @todo http service
 @snapshot
 @snapshot recovery
@@ -81,9 +85,27 @@ done precision = 5/6 的支持！
 
 @master slave
 
+
+
+//config
+geo precision,
+http listen port,
+
+
+
+
 */
 
 func main() {
+
+	/*
+		http://localhost:8000/point/get?id=188&role=5
+
+		curl "http://localhost:8000/point/delete" -d"id=199&role=5"
+
+		http://localhost:8000/location/query?lat=40.056109&lng=116.276329&role=5
+
+	*/
 	responseMapDefine()
 
 	command.PointExpireCollect()
@@ -121,14 +143,124 @@ func main() {
 func pointSetHandler(response http.ResponseWriter, request *http.Request) {
 	//queryForm, err := url.ParseQuery(request.URL.RawQuery)
 
+	method := request.Method
+	if method != "POST" {
+		methoderror := "request method eror"
+		response.Write([]byte(methoderror))
+		return
+	}
+	oid := request.PostFormValue("id")
+	orole := request.PostFormValue("role")
+	if len(oid) < 1 {
+		response.Write(renderResponse(retArgsEmpty, "param id empty!", nil))
+		return
+	}
+	if len(orole) < 1 {
+		response.Write(renderResponse(retArgsEmpty, "param role empty!", nil))
+		return
+
+	}
+
+	id, _ := strconv.Atoi(oid)
+	role, _ := strconv.Atoi(orole)
+
+	if id < 1 {
+		response.Write(renderResponse(retArgsError, "id error!", nil))
+		return
+	}
+	if role < 1 {
+		response.Write(renderResponse(retArgsError, "role error!", nil))
+		return
+	}
+
+	//lat/lng params check
+	olat := request.PostFormValue("lat")
+	olng := request.PostFormValue("lng")
+
+	if len(olat) < 1 || len(olng) < 1 {
+		response.Write(renderResponse(retArgsError, "request lat empty!", nil))
+		return
+	}
+	if len(olng) < 1 || len(olng) < 1 {
+		response.Write(renderResponse(retArgsError, "request lng empty!", nil))
+		return
+	}
+
+	lat, _ := strconv.ParseFloat(olat, 64)
+	lng, _ := strconv.ParseFloat(olng, 64)
+
+	if lat < -180.0 || lat > 180.0 {
+		response.Write(renderResponse(retArgsError, "lat range error", nil))
+		return
+	}
+	if lng < -180.0 || lng > 180.0 {
+		response.Write(renderResponse(retArgsError, "lng range error", nil))
+		return
+	}
+
+	pt := point.Point{Id: uint64(id), Lat: lat, Lng: lng, Role: role}
+
+	oext := request.PostFormValue("ext")
+	if len(oext) > 0 {
+		ext, _ := strconv.Atoi(oext)
+
+		pt.Ext = int64(ext)
+	}
+	oexpire := request.PostFormValue("expire")
+	if len(oexpire) > 0 {
+		expire, _ := strconv.Atoi(oexpire)
+		if expire > 86400*365 {
+			response.Write(renderResponse(retArgsError, "expire time can be empty or within 86400*365", nil))
+			return
+		}
+
+		pt.Expire = expire
+	}
+
+	//id,lat,lng,ext,expire
+	p("------set----point---", pt)
+	set := command.PointSet(pt)
+	if set {
+		response.Write(renderResponse(retOK, "", nil))
+	} else {
+		response.Write(renderResponse(retFailed, "", nil))
+	}
+
 }
 
 func pointDeleteHandler(response http.ResponseWriter, request *http.Request) {
-	//queryForm, err := url.ParseQuery(request.URL.RawQuery)
-	pointQuery, check := pointRequestCommonArgsCheck(response, request)
-	if !check {
+
+	method := request.Method
+	if method != "POST" {
+		methoderror := "request method eror"
+		response.Write([]byte(methoderror))
 		return
 	}
+	oid := request.PostFormValue("id")
+	orole := request.PostFormValue("role")
+	if len(oid) < 1 {
+		response.Write(renderResponse(retArgsEmpty, "param id empty!", nil))
+		return
+	}
+	if len(orole) < 1 {
+		response.Write(renderResponse(retArgsEmpty, "param role empty!", nil))
+		return
+
+	}
+
+	id, _ := strconv.Atoi(oid)
+	role, _ := strconv.Atoi(orole)
+
+	if id < 1 {
+		response.Write(renderResponse(retArgsError, "id error!", nil))
+		return
+	}
+	if role < 1 {
+		response.Write(renderResponse(retArgsError, "role error!", nil))
+		return
+	}
+
+	pointQuery := point.QueryObject{Id: uint64(id), Role: role}
 
 	command.PointDelete(pointQuery)
 	//	ret := command.PointDelete(pointQuery)
@@ -183,11 +315,12 @@ func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
 
 	//radius check
 	oradius, radiusExist := args["radius"]
+	var radius int
 	if !radiusExist {
-		oradius = 2000
+		radius = 2000
 	} else {
-		radius, _ := strconv.ParseFloat(oradius[0], 64)
-		if radius < 0.0 {
+		tradius, _ := strconv.Atoi(oradius[0])
+		if tradius < 0 {
 			response.Write(renderResponse(retArgsError, "radius must be bigger than 0", nil))
 			return
 		}
@@ -196,40 +329,47 @@ func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
 			response.Write(renderResponse(retArgsError, "radius must be smaller than "+fmt.Sprintf("%.6f", radiusMax), nil))
 			return
 		}
+		radius = tradius
 	}
 
 	//limit check
 	olimit, limitExist := args["limit"]
+	var limit int
 	if !limitExist {
 		limit = 20
 	} else {
-		limit, _ := strconv.ParseFloat(oradius[0], 64)
-		if limit < 1 {
+		tlimit, _ := strconv.Atoi(olimit[0])
+		if tlimit < 1 {
 			response.Write(renderResponse(retArgsError, "radius must be bigger than 0", nil))
 			return
 		}
-		if limit > 1000 {
+		if tlimit > 1000 {
 			response.Write(renderResponse(retArgsError, "radius must be smaller than 1000", nil))
 			return
 		}
 
 	}
 	//order check
-	order, orderExist := args["order"]
-	if !limitExist {
+	oorder, orderExist := args["order"]
+	var order string
+	if !orderExist {
 		order = "distance"
 	} else {
-		order, _ := strconv.ParseFloat(oradius[0], 64)
-		if order!="distance" && order !="update"
+		torder := oorder[0]
+		if torder != "distance" && order != "update" {
 			response.Write(renderResponse(retArgsError, "order type must be distance/update", nil))
 			return
 		}
+		order = torder
 
 	}
 
 	qr := location.QueryObject{Lat: lat, Lng: lng, Radius: radius, Role: role, Limit: limit, Order: order}
 	ret := command.LocationQuery(qr)
-//!!!!!!!!!!!!
+
+	response.Write(renderResponse(retOK, "", formatLocationQueryForResponse(qr, ret)))
+	return
+
 	if tool.Debug() {
 		p("------location.Query query=>result -------", qr, ret)
 		for _, v := range ret {
@@ -240,20 +380,59 @@ func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
 
 }
 
+func formatLocationQueryForResponse(qr location.QueryObject, rs []location.QueryResult) map[string]interface{} {
+	var ret map[string]interface{}
+	ret = make(map[string]interface{})
+
+	length := len(rs)
+	if length < 1 {
+		return ret
+	}
+	ret["count"] = length
+
+	var collect []map[string]interface{}
+
+	for _, po := range rs {
+		item := make(map[string]interface{})
+		pot := po.Pshell.Point
+		item["id"] = pot.Id
+		item["lat"] = pot.Lat
+		item["lng"] = pot.Lng
+		item["distance"] = fmt.Sprintf("%.3f", po.Distance)
+		item["update"] = pot.Update
+
+		collect = append(collect, item)
+
+	}
+	/**
+	id,role,lat,lng,update,distance
+	*/
+	ret["role"] = qr.Role
+	ret["requestLat"] = qr.Lat
+	ret["requestLng"] = qr.Lng
+	ret["requestRadius"] = qr.Radius
+	ret["requestOrder"] = qr.Order
+	ret["points"] = collect
+
+	p(ret)
+
+	return ret
+}
+
 func pointRequestCommonArgsCheck(response http.ResponseWriter, request *http.Request) (point.QueryObject, bool) {
 	args, _ := url.ParseQuery(request.URL.RawQuery)
 	p("---request args---:", len(args), args)
 
 	pqr := point.QueryObject{}
 	if len(args) == 0 {
-		response.Write(renderResponse(retArgsEmpty, "", nil))
+		response.Write(renderResponse(retArgsEmpty, "no arguments!", nil))
 		return pqr, false
 	}
 	oid, _ := args["id"]
 	orole, _ := args["role"]
 
 	if len(oid) < 1 || len(orole) < 1 {
-		response.Write(renderResponse(retArgsEmpty, "", nil))
+		response.Write(renderResponse(retArgsEmpty, "id or role empty!", nil))
 
 		return pqr, false
 	}
@@ -326,6 +505,7 @@ func formatPointForResponse(pt point.Point) map[string]interface{} {
 	ret["lat"] = pt.Lat
 	ret["lng"] = pt.Lng
 	ret["update"] = pt.Update
+	ret["ext"] = pt.Ext
 
 	return ret
 }
