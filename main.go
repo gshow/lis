@@ -59,20 +59,20 @@ var queryLimit int = 20
 
 dev route:
 =================
+
+@done
 point/set
 point/query
 location/query
 
 point/delete
 
-done precision = 5/6 的支持！
+precision = 5/6 的支持！
 
 
 
 
-
-
-
+//性能测试
 
 @todo http service
 @snapshot
@@ -106,7 +106,7 @@ func main() {
 
 		curl "http://localhost:8000/point/delete" -d"id=199&role=5"
 
-		http://localhost:8000/location/query?lat=40.056109&lng=116.276329&role=5
+		http://localhost:8000/location/query?lat=40.056109&lng=116.276329&role=5&limit=10
 
 	*/
 	responseMapDefine()
@@ -343,13 +343,14 @@ func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
 	} else {
 		tlimit, _ := strconv.Atoi(olimit[0])
 		if tlimit < 1 {
-			response.Write(renderResponse(retArgsError, "radius must be bigger than 0", nil))
+			response.Write(renderResponse(retArgsError, "limit must be bigger than 0", nil))
 			return
 		}
 		if tlimit > 1000 {
-			response.Write(renderResponse(retArgsError, "radius must be smaller than 1000", nil))
+			response.Write(renderResponse(retArgsError, "limit must be smaller than 1000", nil))
 			return
 		}
+		limit = tlimit
 
 	}
 	//order check
@@ -373,14 +374,6 @@ func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
 	response.Write(renderResponse(retOK, "", formatLocationQueryForResponse(qr, ret)))
 	return
 
-	if tool.Debug() {
-		p("------location.Query query=>result -------", qr, ret)
-		for _, v := range ret {
-			p(v.Pshell.Point.Id, ",")
-
-		}
-	}
-
 }
 
 func formatLocationQueryForResponse(qr location.QueryObject, rs []location.QueryResult) map[string]interface{} {
@@ -401,7 +394,9 @@ func formatLocationQueryForResponse(qr location.QueryObject, rs []location.Query
 		item["id"] = pot.Id
 		item["lat"] = pot.Lat
 		item["lng"] = pot.Lng
-		item["distance"] = fmt.Sprintf("%.3f", po.Distance)
+		item["role"] = pot.Role
+		item["ext"] = pot.Ext
+		item["distance"] = strconv.FormatFloat(po.Distance, 'f', 3, 64) //fmt.Sprintf("%.3f", po.Distance)
 		item["update"] = pot.Update
 
 		collect = append(collect, item)
@@ -417,7 +412,7 @@ func formatLocationQueryForResponse(qr location.QueryObject, rs []location.Query
 	ret["requestOrder"] = qr.Order
 	ret["points"] = collect
 
-	p(ret)
+	//p(ret)
 
 	return ret
 }

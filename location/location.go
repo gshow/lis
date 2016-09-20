@@ -161,7 +161,7 @@ func Query(qr QueryObject) []QueryResult {
 	}
 
 	if tool.Debug() {
-		fmt.Println("-------got total for location query result:---", tmp, len(tmp))
+		fmt.Println("-------got total for location query result:---", qr, tmp, len(tmp))
 	}
 
 	return tmp
