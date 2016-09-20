@@ -83,6 +83,8 @@ precision = 5/6 的支持！
 @todo command.loopThoughtExpireCheck()
 
 
+map concurrency thread safe resolve
+
 @master slave
 
 

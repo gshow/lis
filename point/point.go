@@ -115,22 +115,28 @@ func SetPrepare(pt Point) (string, *PointShell, func(bool)) {
 	oldHash := ""
 	shell, shellExist := roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id]
 
+	var roleLock sync.RWMutex
 	if shellExist {
 		oldHash = shell.Point.Hash
 
 	} else {
 
-		roleLock := roleMap.RoleMap[pt.Role].Lock
+		roleLock = roleMap.RoleMap[pt.Role].Lock
 		roleLock.Lock()
 		shell, shellExist = roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id]
 		if !shellExist {
 			shell = createPointShell(pt)
 			roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id] = shell
 		}
-		roleLock.Unlock()
+
 	}
 	lock := shell.Lock
 	lock.Lock()
+
+	if !shellExist {
+		roleLock.Unlock()
+
+	}
 
 	//	if tool.Debug() {
 	//		fmt.Println("-----point.Set()----", pt, roleMap)
