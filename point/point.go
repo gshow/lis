@@ -5,6 +5,7 @@ import (
 	//"lis/role"
 	"fmt"
 	//"lis/tool"
+	smap "lis/safemap"
 	"time"
 )
 
@@ -71,21 +72,24 @@ type QueryResultObject struct {
 }
 
 type idHashContainer struct {
-	Lock     sync.RWMutex
-	ShellMap map[uint64]*PointShell
+	Lock sync.RWMutex
+	//ShellMap map[uint64]*PointShell
+	ShellMap *smap.SafeMap
 }
 type roleContainer struct {
-	Lock    sync.RWMutex
-	RoleMap map[int]roleObject
+	Lock sync.RWMutex
+	//RoleMap map[int]roleObject
+	RoleMap *smap.SafeMap
 }
 type roleObject struct {
-	Lock       sync.RWMutex
-	IdHsashMap map[uint64]idHashContainer
+	Lock sync.RWMutex
+	//IdHsashMap map[uint64]idHashContainer
+	IdHsashMap *smap.SafeMap
 }
 
 //var PointsCollector = []*Point
 
-var roleMap = roleContainer{RoleMap: make(map[int]roleObject)}
+var roleMap = roleContainer{RoleMap: smap.New()}
 
 func Query(qr QueryObject) Point {
 	pt := Point{Id: qr.Id, Role: qr.Role}
@@ -95,14 +99,15 @@ func Query(qr QueryObject) Point {
 		return Point{}
 	}
 
-	shell, ok := roleMap.RoleMap[pt.Role].IdHsashMap[qr.Id%idHashMod].ShellMap[qr.Id]
+	shell, ok := roleMap.RoleMap.PositiveLinkGet(pt.Role).PositiveLinkGet(qr.Id % idHashMod).Get(qr.Id)
 	if ok == false {
 		return Point{}
 	}
-	if !CheckNotExpire(shell) {
+	shellt := shell.(*PointShell)
+	if !CheckNotExpire(shellt) {
 		return Point{}
 	}
-	return shell.Point
+	return shellt.Point
 
 }
 
@@ -113,30 +118,29 @@ func SetPrepare(pt Point) (string, *PointShell, func(bool)) {
 	mod := pt.Id % idHashMod
 
 	oldHash := ""
-	shell, shellExist := roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id]
-
+	ishell, shellExist := roleMap.RoleMap.PositiveLinkGet(pt.Role).PositiveLinkGet(mod).Get(pt.Id)
+	shell := ishell.(*PointShell)
 	var roleLock sync.RWMutex
 	if shellExist {
 		oldHash = shell.Point.Hash
 
 	} else {
 
-		roleLock = roleMap.RoleMap[pt.Role].Lock
-		roleLock.Lock()
-		shell, shellExist = roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id]
+		idhashCon := roleMap.RoleMap.PositiveLinkGet(pt.Role).PositiveGet(mod)
+		tCon := idhashCon.(*idHashContainer)
+		tCon.Lock.Lock()
+
+		ishell, shellExist = roleMap.RoleMap.PositiveLinkGet(pt.Role).PositiveLinkGet(mod).Get(pt.Id)
 		if !shellExist {
 			shell = createPointShell(pt)
-			roleMap.RoleMap[pt.Role].IdHsashMap[mod].ShellMap[pt.Id] = shell
+			roleMap.RoleMap.PositiveLinkGet(pt.Role).PositiveLinkGet(mod).Set(pt.Id, shell)
 		}
+		shell = ishell.(*PointShell)
+		tCon.Lock.Unlock()
 
 	}
 	lock := shell.Lock
 	lock.Lock()
-
-	if !shellExist {
-		roleLock.Unlock()
-
-	}
 
 	//	if tool.Debug() {
 	//		fmt.Println("-----point.Set()----", pt, roleMap)
@@ -172,27 +176,35 @@ func CheckNotExpire(pshell *PointShell) bool {
 
 func checkIdHashContainer(pt Point, create bool) bool {
 
-	checkRoleContainer(pt, true)
+	ok := checkRoleContainer(pt, create)
+	if !create && !ok { //not exist and no create
+		return ok
+	}
 	mod := pt.Id % idHashMod
-	_, ok := roleMap.RoleMap[pt.Role].IdHsashMap[mod]
-	if ok == false && create == false {
-		return false
-	}
-
-	roleCon := roleMap.RoleMap[pt.Role]
-	roleCon.Lock.Lock()
-	defer roleCon.Lock.Unlock()
-
-	idhashCon, ok := roleMap.RoleMap[pt.Role].IdHsashMap[mod]
+	idhashCon, ok := roleMap.RoleMap.PositiveLinkGet(pt.Role).Get(mod)
 	if ok == false {
-		idhashCon = idHashContainer{ShellMap: make(map[uint64]*PointShell)}
-		roleMap.RoleMap[pt.Role].IdHsashMap[mod] = idhashCon
+		iroleCon := roleMap.RoleMap.PositiveGet(pt.Role)
+		roleCon := iroleCon.(roleContainer)
+		roleCon.Lock.Lock()
+
+		_, ok2 := roleMap.RoleMap.PositiveLinkGet(pt.Role).Get(mod)
+		if ok2 == false {
+			idhashCon = idHashContainer{ShellMap: smap.New()}
+			roleCon.Set(mod, idhashCon)
+
+		}
+		roleCon.Lock.Unlock()
+
 	}
+
+	//	roleCon := roleMap.RoleMap.Get(pt.Role)
+	//	roleCon.Lock
+
 	return true
 }
 
 func checkRoleContainer(pt Point, create bool) bool {
-	_, ok := roleMap.RoleMap[pt.Role]
+	ok := roleMap.RoleMap.Exist(pt.Role)
 	if ok == false && create == false {
 		return false
 	}
@@ -200,10 +212,10 @@ func checkRoleContainer(pt Point, create bool) bool {
 		roleMap.Lock.Lock()
 		defer roleMap.Lock.Unlock()
 
-		_, ok := roleMap.RoleMap[pt.Role]
-		if ok == false {
-			pmap := roleObject{IdHsashMap: make(map[uint64]idHashContainer)}
-			roleMap.RoleMap[pt.Role] = pmap
+		ok2 := roleMap.RoleMap.Exist(pt.Role)
+		if ok2 == false {
+			pmap := roleObject{IdHsashMap: smap.New()}
+			roleMap.RoleMap.Set(pt.Role, pmap)
 		}
 	}
 	return true
