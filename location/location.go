@@ -249,7 +249,7 @@ func Set(shell *point.PointShell, oldGeohash string, callback func(bool)) bool {
 	ishellCon, _ := checkPointShellContainer(shell.Point, true)
 
 	if oldGeohash != "" && shell.Point.Hash != oldGeohash {
-		oishellCon := locationMap.PositiveLinkGet(oldGeohash).PositiveLinkGet(shell.Point.Role)
+		oishellCon := locationMap.PositiveMapGet(oldGeohash).PositiveMapGet(shell.Point.Role)
 		oishellCon.Delete(shell.Point.Id)
 
 	}
@@ -293,7 +293,7 @@ func checkPointShellContainer(pt point.Point, create bool) (*smap.SafeMap, bool)
 			locationMap.SetNotExist(pt.Hash, smap.New())
 		}
 	}
-	roleCon := locationMap.PositiveLinkGet(pt.Hash)
+	roleCon := locationMap.PositiveMapGet(pt.Hash)
 	//mod := pt.Id % idHashMod
 
 	_, ok = roleCon.Get(pt.Role)

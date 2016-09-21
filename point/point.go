@@ -170,7 +170,7 @@ func checkPointShellContainer(pt Point, create bool) (*smap.SafeMap, bool) {
 			roleMap.SetNotExist(pt.Role, smap.New())
 		}
 	}
-	hashCon := roleMap.PositiveLinkGet(pt.Role)
+	hashCon := roleMap.PositiveMapGet(pt.Role)
 	mod := pt.Id % idHashMod
 	_, ok = hashCon.Get(mod)
 	if !ok {

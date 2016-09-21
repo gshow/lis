@@ -3,32 +3,44 @@ package safemap
 /**
 
 @author ricolau<ricolau@qq.com>
-@version 201-09-21
+@version 2016-09-21
 @usage
 
+@warning, presently, not validate the "key" for map,
+for users,please make sure touse a right key type yourself
 
-	b := smap.New()
-    for i:=0;i<10000;i++{
+///=====code=====///
+package main
+import(
+  smap "github.com/ricolau/safemap"
+ "fmt"
+ "time"
+)
+func main(){
+    b := smap.New()
+    for i:=0;i<1000;i++{
         go func(i int){
             b.Set(i,i+1000)
+        }(i)
+
+        go func(i int){
+            b.Exist(i)
+        }(i)
+        go func (i int){
+            b.Get(i+10)
         }(i)
         go func (i int){
             b.Delete(i+10)
         }(i)
-
     }
     time.Sleep(time.Second * 2)
-    p(b.Size())
-
-
-iterator !!!!
-
-
+    fmt.Println(b.Size())
+}
+///=====code=====///
 
 
 */
 import (
-	//"math"
 	"sync"
 )
 
@@ -49,14 +61,6 @@ func New() *SafeMap {
 
 	return s
 }
-
-//func (this *SafeMap) Lock() {
-//	this.lock.Lock()
-//}
-
-//func (this *SafeMap) Unlock() {
-//	this.lock.Unlock()
-//}
 
 func (this *SafeMap) LockForSet(key interface{}, value interface{}) func(bool) {
 
@@ -106,7 +110,6 @@ func (this *SafeMap) Iterate() <-chan tuple {
 	}()
 
 	return ch
-
 }
 
 func (this *SafeMap) Set(key interface{}, value interface{}) bool {
@@ -136,10 +139,13 @@ func (this *SafeMap) SetNotExist(key interface{}, value interface{}) bool {
 	this.usedSize += 1
 
 	return true
-
 }
 
 func (this *SafeMap) Size() int {
+	return this.usedSize
+}
+
+func (this *SafeMap) Len() int {
 	return this.usedSize
 }
 
@@ -148,23 +154,25 @@ func (this *SafeMap) Exist(key interface{}) bool {
 	_, ok := this.mapdata[key]
 	this.lock.Unlock()
 	return ok
-
 }
 
 func (this *SafeMap) PositiveGet(key interface{}) interface{} {
 	this.lock.Lock()
-	value, _ := this.mapdata[key]
+	value, ok := this.mapdata[key]
 	this.lock.Unlock()
+	if !ok {
+		panic("*SafeMap.PositiveGet()  failed!")
+	}
 	return value
 
 }
 
-func (this *SafeMap) PositiveLinkGet(key interface{}) *SafeMap {
+func (this *SafeMap) PositiveMapGet(key interface{}) *SafeMap {
 	this.lock.Lock()
 	value, ok := this.mapdata[key]
 	this.lock.Unlock()
 	if !ok {
-		return nil
+		panic("*SafeMap.PositiveMapGet()  failed!")
 	}
 	return value.(*SafeMap)
 
