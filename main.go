@@ -110,6 +110,15 @@ func main() {
 
 		http://localhost:8000/location/query?lat=40.056109&lng=116.276329&role=5&limit=10
 
+
+//ab
+
+ab -n1000 -c80 -p 'pointset.txt' -T 'application/x-www-form-urlencoded' 'http://t.hit.red:9001/point/set'
+
+
+
+
+
 	*/
 	responseMapDefine()
 
@@ -140,9 +149,10 @@ func main() {
 
 	http.HandleFunc("/location/query", locationQueryHandler)
 
-	http.ListenAndServe(":8000", nil)
 
+	error := http.ListenAndServe(":9001", nil)
 	//fmt.Println("------test distance:----", tool.EarthDistance(pointMiddle.Lat, pointMiddle.Lng, pointMiddle400m.Lat, pointMiddle400m.Lng))
+    fmt.Println(111111111, error)
 }
 
 func pointSetHandler(response http.ResponseWriter, request *http.Request) {
@@ -223,7 +233,7 @@ func pointSetHandler(response http.ResponseWriter, request *http.Request) {
 	}
 
 	//id,lat,lng,ext,expire
-	p("------set----point---", pt)
+	//p("------set----point---", pt)
 	set := command.PointSet(pt)
 	if set {
 		response.Write(renderResponse(retOK, "", nil))
@@ -281,7 +291,7 @@ func pointDeleteHandler(response http.ResponseWriter, request *http.Request) {
 func locationQueryHandler(response http.ResponseWriter, request *http.Request) {
 
 	args, _ := url.ParseQuery(request.URL.RawQuery)
-	p("---request args---:", len(args), args)
+	//p("---request args---:", len(args), args)
 
 	if len(args) == 0 {
 		response.Write(renderResponse(retArgsEmpty, "", nil))
@@ -421,7 +431,7 @@ func formatLocationQueryForResponse(qr location.QueryObject, rs []location.Query
 
 func pointRequestCommonArgsCheck(response http.ResponseWriter, request *http.Request) (point.QueryObject, bool) {
 	args, _ := url.ParseQuery(request.URL.RawQuery)
-	p("---request args---:", len(args), args)
+	//p("---request args---:", len(args), args)
 
 	pqr := point.QueryObject{}
 	if len(args) == 0 {

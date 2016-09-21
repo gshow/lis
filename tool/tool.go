@@ -6,7 +6,7 @@ import (
 )
 
 var P = fmt.Println
-var debug = true
+var debug = false
 
 func Debug() bool {
 	return debug == true
