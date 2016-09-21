@@ -21,13 +21,21 @@ package safemap
     p(b.Size())
 
 
+iterator !!!!
+
+
+
+
 */
 import (
 	//"math"
 	"sync"
 )
 
-var defaultMapSize = 10
+type tuple struct {
+	Key   interface{}
+	Value interface{}
+}
 
 type SafeMap struct {
 	lock     sync.RWMutex
@@ -37,31 +45,72 @@ type SafeMap struct {
 }
 
 func New() *SafeMap {
-	s := &SafeMap{size: defaultMapSize, usedSize: 0, mapdata: make(map[interface{}]interface{}, defaultMapSize)}
+	s := &SafeMap{usedSize: 0, mapdata: make(map[interface{}]interface{})}
 
 	return s
 }
 
-func (this *SafeMap) Lock() {
+//func (this *SafeMap) Lock() {
+//	this.lock.Lock()
+//}
+
+//func (this *SafeMap) Unlock() {
+//	this.lock.Unlock()
+//}
+
+func (this *SafeMap) LockForSet(key interface{}, value interface{}) func(bool) {
+
 	this.lock.Lock()
+	return func(callback bool) {
+
+		if callback {
+			this.mapdata[key] = value
+
+		}
+		this.lock.Unlock()
+
+	}
+
 }
 
-func (this *SafeMap) Unlock() {
-	this.lock.Unlock()
+func (this *SafeMap) LockForDelete(key interface{}) (interface{}, func(bool), bool) {
+
+	this.lock.Lock()
+	ret, ok := this.mapdata[key]
+	if !ok {
+		this.lock.Unlock()
+		return nil, func(bool) {}, false
+	}
+	return ret, func(callback bool) {
+
+		if callback {
+			delete(this.mapdata, key)
+
+		}
+		this.lock.Unlock()
+
+	}, true
+
 }
+
+func (this *SafeMap) Iterate() <-chan tuple {
+	ch := make(chan tuple, 1)
+	go func() {
+		this.lock.Lock()
+		for key, val := range this.mapdata {
+			ch <- tuple{key, val}
+		}
+
+		this.lock.Unlock()
+		close(ch)
+	}()
+
+	return ch
+
+}
+
 func (this *SafeMap) Set(key interface{}, value interface{}) bool {
 	this.lock.Lock()
-	//	if this.usedSize+6 <= this.size {
-
-	//		newSize := int(math.Ceil(float64(this.size) * 1.5))
-
-	//		newMap := make(map[interface{}]interface{}, newSize)
-
-	//		for k, v := range this.mapdata {
-	//			newMap[k] = v
-	//		}
-	//		this.mapdata = newMap
-	//	}
 
 	this.mapdata[key] = value
 	this.usedSize += 1
@@ -72,8 +121,26 @@ func (this *SafeMap) Set(key interface{}, value interface{}) bool {
 
 }
 
+func (this *SafeMap) SetNotExist(key interface{}, value interface{}) bool {
+	this.lock.Lock()
+
+	_, ok := this.mapdata[key]
+	if ok {
+		this.lock.Unlock()
+		return false
+
+	}
+	this.mapdata[key] = value
+
+	this.lock.Unlock()
+	this.usedSize += 1
+
+	return true
+
+}
+
 func (this *SafeMap) Size() int {
-	return this.size
+	return this.usedSize
 }
 
 func (this *SafeMap) Exist(key interface{}) bool {
