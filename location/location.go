@@ -5,7 +5,8 @@ import (
 	"lis/geohash"
 	"lis/point"
 	"lis/tool"
-	"sync"
+	//"sync"
+	smap "lis/safemap"
 )
 
 /*
@@ -13,9 +14,7 @@ import (
 data structure:
 
 LocationContainer{
-	Ldata:{
 		geohash:RoleConainer{
-			RoleMap:{
 				roleid:locationRole{
 					ShellMap:{
 						id:PointShell
@@ -23,31 +22,30 @@ LocationContainer{
 					}
 
 				}
-			}
-
 
 		}
-	}
 
 }
 
 */
 
-type LocationContainer struct {
-	Lock  sync.RWMutex
-	Ldata map[string]roleContainer
-}
+//type LocationContainer struct {
+//	Lock  sync.RWMutex
+//	Ldata map[string]roleContainer
+//}
 
-type roleContainer struct {
-	Lock    sync.RWMutex
-	RoleMap map[int]locationRole
-}
-type locationRole struct {
-	Lock     sync.RWMutex
-	ShellMap map[uint64]*point.PointShell
-}
+//type roleContainer struct {
+//	Lock    sync.RWMutex
+//	RoleMap map[int]locationRole
+//}
+//type locationRole struct {
+//	Lock     sync.RWMutex
+//	ShellMap map[uint64]*point.PointShell
+//}
 
 var geohashPrecision int = 6
+
+var locationMap = smap.New()
 
 type QueryObject struct {
 	Lat    float64
@@ -199,19 +197,18 @@ func queryHashArea(qr QueryObject, geohash string) []QueryResult {
 	//qr := location.QueryObject{Lat: 40.072811113, Lng: 116.318014, Radius: 300, Role: 5, Limit: 3, Order: "distance/update"}
 
 	ret := []QueryResult{}
-	if false == checkHashContainer(pt, false) {
-		return ret
-	}
-	if false == checkRoleContainer(pt, false) {
-
+	ishellCon, ok := checkPointShellContainer(pt, false)
+	if !ok {
 		return ret
 	}
 
-	ptNum := len(locationMap.Ldata[pt.Hash].RoleMap[pt.Role].ShellMap)
+	ptNum := ishellCon.Size()
 	if ptNum <= 0 {
 		return ret
 	}
-	for _, pshell := range locationMap.Ldata[pt.Hash].RoleMap[pt.Role].ShellMap {
+	for tup := range ishellCon.Iterate() {
+		val := tup.Value
+		pshell := val.(*point.PointShell)
 		if point.CheckNotExpire(pshell) == false {
 			continue
 		}
@@ -232,37 +229,31 @@ func queryHashArea(qr QueryObject, geohash string) []QueryResult {
 }
 
 func Summerize() {
-	fmt.Println("-----locationMap.size----", len(locationMap.Ldata))
-	for hash, roleCon := range locationMap.Ldata {
-		fmt.Println("-----locationMap.hash=>size----", hash, len(roleCon.RoleMap))
+	fmt.Println("-----locationMap.size----", locationMap.Size())
+	for tup := range locationMap.Iterate() {
+		roleCon := tup.Value.(*smap.SafeMap)
 
-		for roleid, shellContainer := range roleCon.RoleMap {
-			fmt.Println("-----locationMap.hash,role=>size----", hash, roleid, len(shellContainer.ShellMap))
+		fmt.Println("-----locationMap.hash=>size----", tup.Key, roleCon.Size())
+
+		for tup2 := range roleCon.Iterate() {
+			fmt.Println("-----locationMap.hash,role=>size----", tup.Key, tup2.Key, tup2.Value.(*smap.SafeMap).Size())
 		}
 	}
 
 }
 
-var locationMap = LocationContainer{Ldata: make(map[string]roleContainer)}
-
 func Set(shell *point.PointShell, oldGeohash string, callback func(bool)) bool {
 
 	//save to location hash index
 
-	checkHashContainer(shell.Point, true)
-	checkRoleContainer(shell.Point, true)
+	ishellCon, _ := checkPointShellContainer(shell.Point, true)
 
 	if oldGeohash != "" && shell.Point.Hash != oldGeohash {
-
-		delete(locationMap.Ldata[oldGeohash].RoleMap[shell.Point.Role].ShellMap, shell.Point.Id)
+		oishellCon := locationMap.PositiveLinkGet(oldGeohash).PositiveLinkGet(shell.Point.Role)
+		oishellCon.Delete(shell.Point.Id)
 
 	}
-	//	lock := locationMap.Ldata[shell.Point.Hash].RoleMap[shell.Point.Role].Lock
-	//	lock.Lock()
-	//	defer lock.Unlock()
-	//此处，并发锁，会由 point.SetPrepare/point.DeletePrepare 控制，所以此处不使用锁了，不会出现这里的并发写问题
-
-	locationMap.Ldata[shell.Point.Hash].RoleMap[shell.Point.Role].ShellMap[shell.Point.Id] = shell
+	ishellCon.Set(shell.Point.Id, shell)
 
 	//	if tool.Debug() {
 	//		fmt.Println("-----location.Set()----", locationMap)
@@ -277,8 +268,10 @@ func DeletePoint(pt point.Point, callback func(bool)) bool {
 
 	//此处，并发锁，会由 point.SetPrepare/point.DeletePrepare 控制，所以此处不使用锁了，不会出现这里的并发写问题
 
-	//map delete, do not need mutex
-	delete(locationMap.Ldata[pt.Hash].RoleMap[pt.Role].ShellMap, pt.Id)
+	ishellCon, exist := checkPointShellContainer(pt, false)
+	if exist {
+		ishellCon.Delete(pt.Id)
+	}
 
 	callback(true)
 
@@ -286,42 +279,51 @@ func DeletePoint(pt point.Point, callback func(bool)) bool {
 
 }
 
-func checkRoleContainer(pt point.Point, create bool) bool {
-	_, ok := locationMap.Ldata[pt.Hash].RoleMap[pt.Role]
+func checkPointShellContainer(pt point.Point, create bool) (*smap.SafeMap, bool) {
 
-	if ok == false && create == false {
-		return false
-	}
-	if ok == false {
-		roleCon := locationMap.Ldata[pt.Hash]
-		roleCon.Lock.Lock()
-		defer roleCon.Lock.Unlock()
+	//location, geohash,role,shell,point
 
-		_, ok := roleCon.RoleMap[pt.Role]
-		if ok == false {
-			shellContainer := locationRole{ShellMap: make(map[uint64]*point.PointShell)}
-			roleCon.RoleMap[pt.Role] = shellContainer
+	var ok bool
+	_, ok = locationMap.Get(pt.Hash)
+
+	if !ok {
+		if !create {
+			return smap.New(), false
+		} else {
+			locationMap.SetNotExist(pt.Hash, smap.New())
 		}
 	}
-	return true
-}
+	roleCon := locationMap.PositiveLinkGet(pt.Hash)
+	//mod := pt.Id % idHashMod
 
-func checkHashContainer(pt point.Point, create bool) bool {
-	_, ok := locationMap.Ldata[pt.Hash]
-	if ok == false && create == false {
-		return false
-	}
-
-	if ok == false {
-		locationMap.Lock.Lock()
-		defer locationMap.Lock.Unlock()
-
-		_, ok := locationMap.Ldata[pt.Hash]
-		if ok == false {
-			roleContainer2 := roleContainer{RoleMap: make(map[int]locationRole)}
-			locationMap.Ldata[pt.Hash] = roleContainer2
+	_, ok = roleCon.Get(pt.Role)
+	if !ok {
+		if !create {
+			return smap.New(), false
+		} else {
+			roleCon.SetNotExist(pt.Role, smap.New())
 		}
 	}
-	return true
-
+	shellCon := roleCon.PositiveGet(pt.Role).(*smap.SafeMap)
+	return shellCon, true
 }
+
+//func checkRoleContainer(pt point.Point, create bool) bool {
+//	_, ok := locationMap.Ldata[pt.Hash].RoleMap[pt.Role]
+
+//	if ok == false && create == false {
+//		return false
+//	}
+//	if ok == false {
+//		roleCon := locationMap.Ldata[pt.Hash]
+//		roleCon.Lock.Lock()
+//		defer roleCon.Lock.Unlock()
+
+//		_, ok := roleCon.RoleMap[pt.Role]
+//		if ok == false {
+//			shellContainer := locationRole{ShellMap: make(map[uint64]*point.PointShell)}
+//			roleCon.RoleMap[pt.Role] = shellContainer
+//		}
+//	}
+//	return true
+//}

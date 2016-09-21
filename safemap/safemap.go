@@ -161,8 +161,11 @@ func (this *SafeMap) PositiveGet(key interface{}) interface{} {
 
 func (this *SafeMap) PositiveLinkGet(key interface{}) *SafeMap {
 	this.lock.Lock()
-	value, _ := this.mapdata[key]
+	value, ok := this.mapdata[key]
 	this.lock.Unlock()
+	if !ok {
+		return nil
+	}
 	return value.(*SafeMap)
 
 }
