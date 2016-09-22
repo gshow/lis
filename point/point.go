@@ -71,24 +71,6 @@ type QueryResultObject struct {
 	//Expire int
 }
 
-//type idHashContainer struct {
-//	Lock sync.RWMutex
-//	//ShellMap map[uint64]*PointShell
-//	ShellMap *smap.SafeMap
-//}
-//type roleContainer struct {
-//	Lock sync.RWMutex
-//	//RoleMap map[int]roleObject
-//	RoleMap *smap.SafeMap
-//}
-//type roleObject struct {
-//	Lock sync.RWMutex
-//	//IdHsashMap map[uint64]idHashContainer
-//	IdHsashMap *smap.SafeMap
-//}
-
-//var PointsCollector = []*Point
-
 var roleMap = smap.New()
 
 func Query(qr QueryObject) Point {
@@ -110,12 +92,12 @@ func Query(qr QueryObject) Point {
 
 }
 
-func SetPrepare(pt Point) (string, *PointShell, func(bool)) {
+func SetWithAggrement(pt Point, aggrement func(key interface{}, value interface{}, oldvalue interface{}) bool) bool {
 	//save to roleMap-pointHashContainer-point
 
 	shellcon, _ := checkPointShellContainer(pt, true)
 
-	oldHash := ""
+	//oldHash := ""
 	var shell *PointShell
 	ishell, shellExist := shellcon.Get(pt.Id)
 	if !shellExist {
@@ -125,20 +107,17 @@ func SetPrepare(pt Point) (string, *PointShell, func(bool)) {
 
 	}
 
-	if shellExist {
-		oldHash = shell.Point.Hash
-
-	} else {
+	if !shellExist {
 		shell = createPointShell(pt)
 
 	}
-	callback := shellcon.LockForSet(pt.Id, shell)
+	setResult := shellcon.SetWithAggrement(pt.Id, shell, aggrement)
 
 	//	if tool.Debug() {
 	//		fmt.Println("-----point.Set()----", pt, roleMap)
 	//		fmt.Println("geohash:", pt.Hash)
 	//	}
-	return oldHash, shell, callback
+	return setResult
 
 }
 
@@ -185,38 +164,42 @@ func checkPointShellContainer(pt Point, create bool) (*smap.SafeMap, bool) {
 }
 
 func Summerize() {
-	totalPoint := 0
-	fmt.Println("-----roleMap.size----", roleMap.Size())
-	for /*roleid*/ son := range roleMap.Iterate() {
-		rolecon := son.Value.(*smap.SafeMap)
-		for /*idhash*/ idhashCon := range rolecon.Iterate() {
-			totalPoint += idhashCon.Value.(*smap.SafeMap).Size()
-		}
 
-		//fmt.Println("-----roleMap.roleObject=>size----", role, len(son.IdHsashMap))
+	totalPoint := 0
+	var rolecon *smap.SafeMap
+
+	rangeCallSon := func(k interface{}, value interface{}) bool {
+		rolecon = value.(*smap.SafeMap)
+		totalPoint += value.(*smap.SafeMap).Size()
+		return true
 
 	}
+	rangeCall := func(k interface{}, value interface{}) bool {
+		rolecon := value.(*smap.SafeMap)
+		rolecon.Range(rangeCallSon)
+		return true
+
+	}
+	roleMap.Range(rangeCall)
+
+	fmt.Println("-----roleMap.size----", roleMap.Size())
+
 	fmt.Println("-----total point size----", totalPoint)
 
 }
 
-func DeletePrepare(qr QueryObject) (bool, Point, func(bool)) {
+func DeleteWithAggrement(qr QueryObject, aggrement func(key interface{}, oldvalue interface{}) bool) bool {
+	//save to roleMap-pointHashContainer-point
 
 	pt := Point{Id: qr.Id, Role: qr.Role}
+
 	shellCon, ok := checkPointShellContainer(pt, false)
 	if !ok {
-		return false, Point{}, func(bool) {}
+		return false
 	}
 
-	ishell, callback, exist := shellCon.LockForDelete(qr.Id)
-	var shell *PointShell
-	if !exist {
-		shell = new(PointShell)
+	result := shellCon.DeleteWithAggrement(pt.Id, aggrement)
 
-	} else {
-		shell = ishell.(*PointShell)
-	}
-
-	return exist, shell.Point, callback
+	return result
 
 }

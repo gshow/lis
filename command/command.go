@@ -5,7 +5,7 @@ import (
 	"lis/geohash"
 	"lis/location"
 	"lis/point"
-    "lis/tool"
+	"lis/tool"
 	"time"
 )
 
@@ -18,15 +18,27 @@ func PointSet(point2 point.Point) bool {
 	if point2.Expire > 0 {
 		point2.Expire += int(time.Now().Unix())
 	}
-	if tool.Debug(){
-        fmt.Println("----got set---", point2)
-    }
-	oldGeohash, shell, callback := point.SetPrepare(point2)
+	if tool.Debug() {
+		fmt.Println("----got set---", point2)
+	}
 
-	//save to geohash
-	location.Set(shell, oldGeohash, callback)
+	//	//save to geohash
 
-	return true
+	aggrement := func(id interface{}, value interface{}, oldvalue interface{}) bool {
+		//rid := id.(int)
+		if oldvalue != nil {
+			oldshell := oldvalue.(*point.PointShell)
+			//oldhash := oldshell.Point.Hash
+			return location.DeletePoint(oldshell.Point)
+
+		}
+		shell := value.(*point.PointShell)
+		return location.Set(shell)
+	}
+
+	ret := point.SetWithAggrement(point2, aggrement)
+
+	return ret
 }
 
 func PointDelete(qr point.QueryObject) bool {
@@ -35,16 +47,24 @@ func PointDelete(qr point.QueryObject) bool {
 }
 
 func _pointDelete(qr point.QueryObject, expireDelete bool) bool {
-	ok, point, callback := point.DeletePrepare(qr)
-	if !ok {
-		callback(false)
-		return false
+
+	aggrement := func(id interface{}, oldvalue interface{}) bool {
+		//rid := id.(int)
+
+		if oldvalue != nil {
+			oldshell := oldvalue.(*point.PointShell)
+			if expireDelete && oldshell.Point.Expire >= int(time.Now().Unix()) {
+
+				return false
+			}
+			return location.DeletePoint(oldshell.Point)
+		}
+		return true
+
 	}
-	if expireDelete && point.Expire >= time.Now().Second() {
-		callback(false)
-		return false
-	}
-	return location.DeletePoint(point, callback)
+	ok := point.DeleteWithAggrement(qr, aggrement)
+
+	return ok
 
 }
 

@@ -29,20 +29,6 @@ LocationContainer{
 
 */
 
-//type LocationContainer struct {
-//	Lock  sync.RWMutex
-//	Ldata map[string]roleContainer
-//}
-
-//type roleContainer struct {
-//	Lock    sync.RWMutex
-//	RoleMap map[int]locationRole
-//}
-//type locationRole struct {
-//	Lock     sync.RWMutex
-//	ShellMap map[uint64]*point.PointShell
-//}
-
 var geohashPrecision int = 6
 
 var locationMap = smap.New()
@@ -208,18 +194,21 @@ func queryHashArea(qr QueryObject, geohash string) []QueryResult {
 	if ptNum <= 0 {
 		return ret
 	}
-	for tup := range ishellCon.Iterate() {
-		val := tup.Value
-		pshell := val.(*point.PointShell)
+
+	rangeCall := func(key interface{}, value interface{}) bool {
+		pshell := value.(*point.PointShell)
 		if point.CheckNotExpire(pshell) == false {
-			continue
+			return true
 		}
 		distance := tool.EarthDistance(qr.Lat, qr.Lng, pshell.Point.Lat, pshell.Point.Lng)
 		if int(distance) > qr.Radius {
-			continue
+			return true
 		}
 		ret = append(ret, QueryResult{Pshell: pshell, Distance: distance})
+		return true
 	}
+
+	ishellCon.Range(rangeCall)
 
 	if len(ret) > qr.Limit {
 		ret = queryResultSort(ret, qr.Order)
@@ -231,51 +220,48 @@ func queryHashArea(qr QueryObject, geohash string) []QueryResult {
 }
 
 func Summerize() {
-	fmt.Println("-----locationMap.size----", locationMap.Size())
-	for tup := range locationMap.Iterate() {
-		roleCon := tup.Value.(*smap.SafeMap)
 
-		fmt.Println("-----locationMap.hash=>size----", tup.Key, roleCon.Size())
+	rangeCallSon := func(k interface{}, value interface{}) bool {
 
-		for tup2 := range roleCon.Iterate() {
-			fmt.Println("-----locationMap.hash,role=>size----", tup.Key, tup2.Key, tup2.Value.(*smap.SafeMap).Size())
-		}
+		fmt.Println("-----locationMap,role=>size----", k, value.(*smap.SafeMap).Size())
+
+		return true
+
 	}
+	rangeCall := func(k interface{}, value interface{}) bool {
+		rolecon := value.(*smap.SafeMap)
+		fmt.Println("-----locationMap.hash=>size----", k, rolecon.Size())
+
+		rolecon.Range(rangeCallSon)
+		return true
+
+	}
+	locationMap.Range(rangeCall)
 
 }
 
-func Set(shell *point.PointShell, oldGeohash string, callback func(bool)) bool {
+func Set(shell *point.PointShell) bool {
 
 	//save to location hash index
 
 	ishellCon, _ := checkPointShellContainer(shell.Point, true)
 
-	if oldGeohash != "" && shell.Point.Hash != oldGeohash {
-		oishellCon := locationMap.PositiveMapGet(oldGeohash).PositiveMapGet(shell.Point.Role)
-		oishellCon.Delete(shell.Point.Id)
-
-	}
 	ishellCon.Set(shell.Point.Id, shell)
 
 	//	if tool.Debug() {
 	//		fmt.Println("-----location.Set()----", locationMap)
 	//	}
 
-	callback(true)
 	return true
 
 }
 
-func DeletePoint(pt point.Point, callback func(bool)) bool {
-
-	//此处，并发锁，会由 point.SetPrepare/point.DeletePrepare 控制，所以此处不使用锁了，不会出现这里的并发写问题
+func DeletePoint(pt point.Point) bool {
 
 	ishellCon, exist := checkPointShellContainer(pt, false)
 	if exist {
-		ishellCon.Delete(pt.Id)
+		return ishellCon.Delete(pt.Id)
 	}
-
-	callback(true)
 
 	return true
 
@@ -309,23 +295,3 @@ func checkPointShellContainer(pt point.Point, create bool) (*smap.SafeMap, bool)
 	shellCon := roleCon.PositiveGet(pt.Role).(*smap.SafeMap)
 	return shellCon, true
 }
-
-//func checkRoleContainer(pt point.Point, create bool) bool {
-//	_, ok := locationMap.Ldata[pt.Hash].RoleMap[pt.Role]
-
-//	if ok == false && create == false {
-//		return false
-//	}
-//	if ok == false {
-//		roleCon := locationMap.Ldata[pt.Hash]
-//		roleCon.Lock.Lock()
-//		defer roleCon.Lock.Unlock()
-
-//		_, ok := roleCon.RoleMap[pt.Role]
-//		if ok == false {
-//			shellContainer := locationRole{ShellMap: make(map[uint64]*point.PointShell)}
-//			roleCon.RoleMap[pt.Role] = shellContainer
-//		}
-//	}
-//	return true
-//}

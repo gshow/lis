@@ -6,8 +6,8 @@ package safemap
 @version 2016-09-21
 @usage
 
-@warning, presently, not validate the "key" for map,
-for users,please make sure touse a right key type yourself
+@warning, presently, there's not validation for the "key" of map,
+for users,please make sure to use a right key type yourself
 
 ///=====code=====///
 package main
@@ -44,11 +44,6 @@ import (
 	"sync"
 )
 
-type tuple struct {
-	Key   interface{}
-	Value interface{}
-}
-
 type SafeMap struct {
 	lock     sync.RWMutex
 	size     int
@@ -62,104 +57,95 @@ func New() *SafeMap {
 	return s
 }
 
-func (this *SafeMap) LockForSet(key interface{}, value interface{}) func(bool) {
+func (smap *SafeMap) SetWithAggrement(key interface{}, value interface{}, aggrement func(key interface{}, value interface{}, oldvalue interface{}) bool) bool {
+	smap.lock.Lock()
+	defer smap.lock.Unlock()
 
-	this.lock.Lock()
-	return func(callback bool) {
+	oldvalue, _ := smap.mapdata[key]
 
-		if callback {
-			this.mapdata[key] = value
+	aggred := aggrement(key, value, oldvalue)
+	if aggred {
+		smap.mapdata[key] = value
+	}
+	return aggred
+}
 
+func (smap *SafeMap) DeleteWithAggrement(key interface{}, aggrement func(key interface{}, oldvalue interface{}) bool) bool {
+	smap.lock.Lock()
+	defer smap.lock.Unlock()
+
+	oldvalue, ok := smap.mapdata[key]
+
+	aggred := aggrement(key, oldvalue)
+	ifDelete := aggred && ok
+	if ifDelete {
+		delete(smap.mapdata, key)
+	}
+	return ifDelete
+}
+
+func (smap *SafeMap) Range(callback func(key interface{}, value interface{}) bool) {
+	smap.lock.Lock()
+	defer smap.lock.Unlock()
+
+	for k, v := range smap.mapdata {
+		continued := callback(k, v)
+		if !continued {
+			break
 		}
-		this.lock.Unlock()
 
 	}
 
 }
 
-func (this *SafeMap) LockForDelete(key interface{}) (interface{}, func(bool), bool) {
+func (smap *SafeMap) Set(key interface{}, value interface{}) bool {
+	smap.lock.Lock()
 
-	this.lock.Lock()
-	ret, ok := this.mapdata[key]
-	if !ok {
-		this.lock.Unlock()
-		return nil, func(bool) {}, false
-	}
-	return ret, func(callback bool) {
+	smap.mapdata[key] = value
+	smap.usedSize += 1
 
-		if callback {
-			delete(this.mapdata, key)
-
-		}
-		this.lock.Unlock()
-
-	}, true
-
-}
-
-func (this *SafeMap) Iterate() <-chan tuple {
-	ch := make(chan tuple, 1)
-	go func() {
-		this.lock.Lock()
-		for key, val := range this.mapdata {
-			ch <- tuple{key, val}
-		}
-
-		this.lock.Unlock()
-		close(ch)
-	}()
-
-	return ch
-}
-
-func (this *SafeMap) Set(key interface{}, value interface{}) bool {
-	this.lock.Lock()
-
-	this.mapdata[key] = value
-	this.usedSize += 1
-
-	this.lock.Unlock()
+	smap.lock.Unlock()
 
 	return true
 
 }
 
-func (this *SafeMap) SetNotExist(key interface{}, value interface{}) bool {
-	this.lock.Lock()
+func (smap *SafeMap) SetNotExist(key interface{}, value interface{}) bool {
+	smap.lock.Lock()
 
-	_, ok := this.mapdata[key]
+	_, ok := smap.mapdata[key]
 	if ok {
-		this.lock.Unlock()
+		smap.lock.Unlock()
 		return false
 
 	}
-	this.mapdata[key] = value
+	smap.mapdata[key] = value
 
-	this.lock.Unlock()
-	this.usedSize += 1
+	smap.lock.Unlock()
+	smap.usedSize += 1
 
 	return true
 }
 
-func (this *SafeMap) Size() int {
-	return this.usedSize
+func (smap *SafeMap) Size() int {
+	return smap.usedSize
 }
 
-func (this *SafeMap) Len() int {
-	return this.usedSize
+func (smap *SafeMap) Len() int {
+	return smap.usedSize
 }
 
-func (this *SafeMap) Exist(key interface{}) bool {
-	this.lock.Lock()
-	_, ok := this.mapdata[key]
-	this.lock.Unlock()
+func (smap *SafeMap) Exist(key interface{}) bool {
+	smap.lock.Lock()
+	_, ok := smap.mapdata[key]
+	smap.lock.Unlock()
 	return ok
 }
 
-func (this *SafeMap) PositiveGet(key interface{}) interface{} {
-	this.lock.Lock()
-	value, ok := this.mapdata[key]
-	this.lock.Unlock()
+func (smap *SafeMap) PositiveGet(key interface{}) interface{} {
+	smap.lock.Lock()
+	value, ok := smap.mapdata[key]
+	smap.lock.Unlock()
 	if !ok {
 		panic("*SafeMap.PositiveGet()  failed!")
 	}
@@ -167,10 +153,10 @@ func (this *SafeMap) PositiveGet(key interface{}) interface{} {
 
 }
 
-func (this *SafeMap) PositiveMapGet(key interface{}) *SafeMap {
-	this.lock.Lock()
-	value, ok := this.mapdata[key]
-	this.lock.Unlock()
+func (smap *SafeMap) PositiveMapGet(key interface{}) *SafeMap {
+	smap.lock.Lock()
+	value, ok := smap.mapdata[key]
+	smap.lock.Unlock()
 	if !ok {
 		panic("*SafeMap.PositiveMapGet()  failed!")
 	}
@@ -178,21 +164,20 @@ func (this *SafeMap) PositiveMapGet(key interface{}) *SafeMap {
 
 }
 
-func (this *SafeMap) Get(key interface{}) (interface{}, bool) {
-	this.lock.Lock()
-	value, ok := this.mapdata[key]
-	this.lock.Unlock()
+func (smap *SafeMap) Get(key interface{}) (interface{}, bool) {
+	smap.lock.Lock()
+	value, ok := smap.mapdata[key]
+	smap.lock.Unlock()
 	return value, ok
-
 }
 
-func (this *SafeMap) Delete(key interface{}) bool {
-	this.lock.Lock()
-	_, ok := this.mapdata[key]
+func (smap *SafeMap) Delete(key interface{}) bool {
+	smap.lock.Lock()
+	_, ok := smap.mapdata[key]
 	if ok {
-		delete(this.mapdata, key)
-		this.usedSize -= 1
+		delete(smap.mapdata, key)
+		smap.usedSize -= 1
 	}
-	this.lock.Unlock()
+	smap.lock.Unlock()
 	return true
 }
