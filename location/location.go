@@ -62,11 +62,17 @@ type QueryResult struct {
 	Distance float64
 }
 
-var radiusLoopMap map[int]map[int]float64 = map[int]map[int]float64{5: {1: 14700.0, 2: 24500.0, 3: 34300.0, 4: 44100.0, 5: 53900.0}, 6: {1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}}
+//var radiusLoopMap map[int]map[int]float64 = map[int]map[int]float64{5: {1: 14700.0, 2: 24500.0, 3: 34300.0, 4: 44100.0, 5: 53900.0}, 6: {1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}}
 
-//var radiusLoopMap5 map[int]float64 = map[int]float64{1: 14700.0, 2: 24500.0, 3: 34300.0, 4: 44100.0, 5: 53900.0}
+var radiusLoopMap5 map[int]float64 = map[int]float64{1: 9800.0, 2: 19600.0, 3: 29400.0, 4: 39200.0, 5: 49000.0, 6: 58800.0, 7: 68600.0, 8: 78400.0, 9: 88200.0, 10: 98000.0, 11: 107800.0, 12: 117600.0}
 
-//var radiusLoopMap6 map[int]float64 = map[int]float64{1: 1828.0, 2: 3047.0, 3: 4265.0, 4: 5484.0, 5: 6703.0}
+var radiusLoopMap6 map[int]float64 = map[int]float64{1: 1219.2, 2: 2438.0, 3: 3656.8, 4: 4875.6, 5: 6094.4, 6: 7312.4, 7: 8526.0, 8: 9744.0, 9: 10943.0, 10: 12180.0, 11: 13392.0, 12: 14616.0}
+
+var radiusLoopMap map[int]map[int]float64 = map[int]map[int]float64{5: radiusLoopMap5, 6: radiusLoopMap6}
+
+func ini() {
+
+}
 
 func GetRadiusMax() int {
 	return int(radiusLoopMap[GetGeohashPrecision()][5])
