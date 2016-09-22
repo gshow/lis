@@ -70,10 +70,6 @@ var radiusLoopMap6 map[int]float64 = map[int]float64{1: 1219.2, 2: 2438.0, 3: 36
 
 var radiusLoopMap map[int]map[int]float64 = map[int]map[int]float64{5: radiusLoopMap5, 6: radiusLoopMap6}
 
-func ini() {
-
-}
-
 func GetRadiusMax() int {
 	return int(radiusLoopMap[GetGeohashPrecision()][5])
 }
