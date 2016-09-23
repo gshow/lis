@@ -9,6 +9,7 @@ import (
 	"lis/tool"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -102,18 +103,18 @@ func main() {
 
 	/*
 
-			http://localhost:8000/point/get?id=188&role=5
+				http://localhost:8000/point/get?id=188&role=5
 
-			curl "http://localhost:8000/point/set" -d"id=188&role=5&lat=40.045839625&lng=116.2864475&ext=111111112&expire=2"
+				curl "http://localhost:8000/point/set" -d"id=188&role=5&lat=40.045839625&lng=116.2864475&ext=111111112&expire=2"
 
-			curl "http://localhost:8000/point/delete" -d"id=199&role=5"
+				curl "http://localhost:8000/point/delete" -d"id=199&role=5"
 
-			http://localhost:8000/location/query?lat=40.056109&lng=116.276329&role=5&limit=10
+				http://localhost:8000/location/query?lat=40.056109&lng=116.276329&role=5&limit=10
 
 
-	//ab
+		//ab
 
-	ab -n1000 -c80 -p 'pointset.txt' -T 'application/x-www-form-urlencoded' 'http://t.hit.red:9001/point/set'
+		ab -n1000 -c80 -p 'pointset.txt' -T 'application/x-www-form-urlencoded' 'http://t.hit.red:9001/point/set'
 
 
 
